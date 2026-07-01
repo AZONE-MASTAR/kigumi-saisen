@@ -287,8 +287,8 @@ new STLLoader().load('models/saisen.stl', geo=>{
   holder.add(boxMesh);
   boxHalfZ=(size.z*sc)/2; boxTopY=BASE_TOP+size.y*sc; boxW=size.x*sc;
   // name plane on the front (+Z) face, lower-center
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(boxW*0.62, boxW*0.62*0.25), new THREE.MeshStandardMaterial({transparent:true, roughness:0.6, metalness:0}));
-  np.position.set(0, BASE_TOP+size.y*sc*0.42, boxHalfZ+0.008); np.visible=false; nameMesh=np; holder.add(np);
+  const np=new THREE.Mesh(new THREE.PlaneGeometry(boxW*0.60, boxW*0.60*0.30), new THREE.MeshStandardMaterial({transparent:true, roughness:0.6, metalness:0}));
+  np.position.set(0, BASE_TOP+size.y*sc*0.225, boxHalfZ+0.008); np.visible=false; nameMesh=np; holder.add(np);
   controls.target.set(0, BASE_TOP+size.y*sc*0.5, 0);
   camera.position.set(0, BASE_TOP+size.y*sc*0.62, Math.max(5, size.y*sc*2.0));
   controls.update();
