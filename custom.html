@@ -155,16 +155,16 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ---------- options ----------
 const FONTS=[{n:'明朝',css:'"Shippori Mincho B1", serif'},{n:'古印',css:'"Zen Old Mincho", serif'},{n:'ゴシック',css:'"Zen Kaku Gothic New", sans-serif'}];
-const ENG_COLOR='#5a3a1a';                                          // 刻印色は茶色のみ
+const ENG_COLOR='#9c7846';                                          // 刻印色は茶色のみ（薄めの焼き色）
 // 素材・仕上げ（実物大 約150×85×163mm・完成品／受注生産）※価格は目安
 const FINISHES=[
   {n:'竹・素地',  note:'竹集成材・大分',         base:0xd8b878, price:6800}   // 竹の素地のみ
 ];
 // 刻印スロット（GLBのノード名で対応付け）：前面の大きな板＋鳥居の額束に2つの一文字
 const ENGRAVINGS=[
-  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱', fill:0.72, weight:700, pscale:1.0},
-  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:'',     fill:0.96, weight:900, pscale:1.18},
-  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:'',     fill:0.96, weight:900, pscale:1.18}
+  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱', fill:0.36, weight:700, pscale:1.0},
+  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:'',     fill:0.90, weight:700, pscale:1.18},
+  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:'',     fill:0.90, weight:700, pscale:1.18}
 ];
 let fontIdx=0, finIdx=0;
 const engVal={}; ENGRAVINGS.forEach(e=>engVal[e.id]=e.def);         // 標準で前面に「賽銭箱」
@@ -255,10 +255,9 @@ function makeEngTex(text, aspect, fill, weight){
     const maxW=W*0.94;
     while(x.measureText(text).width>maxW && fs>18){ fs-=4; x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
     const cx=W/2, cy=H*0.54;
-    x.shadowColor='rgba(0,0,0,0.4)'; x.shadowBlur=4; x.shadowOffsetY=2;
-    // 濃い縁取りで彫り込み感を強め、茶色で塗る
-    x.lineJoin='round'; x.lineWidth=Math.max(2,fs*0.045); x.strokeStyle='#3a2410'; x.strokeText(text,cx,cy);
-    x.shadowColor='transparent'; x.fillStyle=ENG_COLOR; x.fillText(text,cx,cy);
+    // 薄い焼き色でやわらかく（重い黒縁は無し）
+    x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
+    x.fillStyle=ENG_COLOR; x.fillText(text,cx,cy);
   }
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
@@ -276,7 +275,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooTex(FINISHES[finIdx].base), color:0xffffff, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
-  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0x6a451f), color:0xffffff, roughness:0.6, metalness:0.03, envMapIntensity:0.55});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0xad8a56), color:0xffffff, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)は退避してノード名で対応付け
   const engNodes={};
@@ -300,15 +299,19 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   ENGRAVINGS.forEach(e=>{
     const node=engNodes[e.id]; if(!node) return;
     node.updateWorldMatrix(true,false);
-    const wb=new THREE.Box3().setFromObject(node);
-    const ws=new THREE.Vector3(), wc=new THREE.Vector3(); wb.getSize(ws); wb.getCenter(wc);
+    const wp=new THREE.Vector3(), wq=new THREE.Quaternion(), wsc=new THREE.Vector3();
+    node.matrixWorld.decompose(wp,wq,wsc);                     // 位置・向き・寸法を分解（負スケールも安全に）
     node.visible=false;                                        // プレースホルダのCubeは非表示
     const ps=e.pscale||1;
-    const W=Math.max(ws.x,0.02)*ps, H=Math.max(ws.y,0.02)*ps;
+    const W=Math.max(Math.abs(wsc.x)*2*ps,0.02), H=Math.max(Math.abs(wsc.y)*2*ps,0.02);  // 単位Cube(±1)→×2
     e.aspect=W/H;
+    // 刻印板の面法線を前向きに→その傾きにテキスト面を沿わせる（額束の斜めに追従）
+    let n=new THREE.Vector3(0,0,1).applyQuaternion(wq); if(n.z<0) n.negate(); n.normalize();
+    const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), n);
     const mat=new THREE.MeshStandardMaterial({transparent:true, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
     const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
-    plane.position.set(wc.x, wc.y, wb.max.z+0.006);            // 前面のわずか手前
+    plane.quaternion.copy(q);
+    plane.position.copy(wp).addScaledVector(n, 0.02);          // 面のわずか手前
     plane.renderOrder=3; plane.visible=false;
     holder.add(plane); e.plane=plane;
   });
