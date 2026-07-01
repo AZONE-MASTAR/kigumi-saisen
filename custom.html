@@ -163,8 +163,8 @@ const FINISHES=[
 // 刻印スロット（GLBのノード名で対応付け）：前面の大きな板＋鳥居の額束に2つの一文字
 const ENGRAVINGS=[
   {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱', fill:0.36, weight:700, pscale:1.0},
-  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:'',     fill:0.90, weight:700, pscale:1.18},
-  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:'',     fill:0.90, weight:700, pscale:1.18}
+  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：開',              max:1,  def:'開',   fill:0.90, weight:700, pscale:1.18},
+  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：運',              max:1,  def:'運',   fill:0.90, weight:700, pscale:1.18}
 ];
 let fontIdx=0, finIdx=0;
 const engVal={}; ENGRAVINGS.forEach(e=>engVal[e.id]=e.def);         // 標準で前面に「賽銭箱」
@@ -282,7 +282,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   root.traverse(o=>{
     if(!o.isMesh) return;
     const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
-    if(eng){ engNodes[eng.id]=o; return; }
+    if(eng){ engNodes[eng.id]=o; o.visible=false; return; }   // プレースホルダCubeは非表示（レイキャスト対象外に）
     const brown=isBrown(o);
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
     o.material=brown?brownMat:boxMat; o.castShadow=true; o.receiveShadow=true;
@@ -296,22 +296,26 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   boxGroup.scale.setScalar(sc); boxGroup.position.y=BASE_TOP+(size.y*sc)/2;
   holder.add(boxGroup); holder.updateMatrixWorld(true);
   // 各刻印スロット：GLBで定義された位置・サイズに合わせ、前面(+Z)向きのテキスト面を配置
+  const rc=new THREE.Raycaster();
   ENGRAVINGS.forEach(e=>{
     const node=engNodes[e.id]; if(!node) return;
     node.updateWorldMatrix(true,false);
     const wp=new THREE.Vector3(), wq=new THREE.Quaternion(), wsc=new THREE.Vector3();
     node.matrixWorld.decompose(wp,wq,wsc);                     // 位置・向き・寸法を分解（負スケールも安全に）
-    node.visible=false;                                        // プレースホルダのCubeは非表示
     const ps=e.pscale||1;
     const W=Math.max(Math.abs(wsc.x)*2*ps,0.02), H=Math.max(Math.abs(wsc.y)*2*ps,0.02);  // 単位Cube(±1)→×2
     e.aspect=W/H;
     // 刻印板の面法線を前向きに→その傾きにテキスト面を沿わせる（額束の斜めに追従）
     let n=new THREE.Vector3(0,0,1).applyQuaternion(wq); if(n.z<0) n.negate(); n.normalize();
     const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), n);
+    // 竹面へ密着：面の手前からレイキャストして実際の竹面に置く（浮き防止・奥へ吸着）
+    rc.set(wp.clone().addScaledVector(n, 0.35), n.clone().negate());
+    const hit=rc.intersectObject(boxGroup, true)[0];
+    const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n, 0.003);
     const mat=new THREE.MeshStandardMaterial({transparent:true, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
     const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
     plane.quaternion.copy(q);
-    plane.position.copy(wp).addScaledVector(n, 0.02);          // 面のわずか手前
+    plane.position.copy(pos);
     plane.renderOrder=3; plane.visible=false;
     holder.add(plane); e.plane=plane;
   });

@@ -171,7 +171,7 @@ function engTex(text,aspect){
   const W=1024,H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
   x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';
-  let fs=Math.round(H*0.36); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
+  let fs=Math.round(H*(fill||0.36)); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
   while(x.measureText(text).width>W*0.94 && fs>12){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
   const cx=W/2, cy=H*0.54;
   x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
@@ -187,9 +187,10 @@ PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
     const mat=new THREE.MeshStandardMaterial({map:bambooTex(p.base),roughness:0.62,metalness:0.02,envMapIntensity:0.7});
     const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0xad8a56),roughness:0.6,metalness:0.03,envMapIntensity:0.6});   // 「茶色」＝橙マテリアルの部位（薄め）
     const isBrownM=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
-    let bigNode=null;
+    const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
+    const engNodes=[];
     root.traverse(o=>{ if(!o.isMesh) return;
-      if(isEng(o)){ o.visible=false; if(o.name.includes('大きな')) bigNode=o; return; }   // 刻印プレースホルダは非表示
+      if(isEng(o)){ o.visible=false; for(const k in ENGMAP){ if(o.name.includes(k)){ engNodes.push({node:o,cfg:ENGMAP[k]}); break; } } return; }   // 刻印プレースホルダは非表示
       const brown=isBrownM(o);
       o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=brown?brownMat:mat; o.castShadow=true;
     });
@@ -200,13 +201,20 @@ PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
     const targetH=1.35, sc=targetH/Math.max(size.y,0.001);
     g.scale.setScalar(sc); g.position.set(p.pos[0],PED_TOP+size.y*sc/2,p.pos[1]);
     scene.add(g); g.updateMatrixWorld(true);
-    // 前面に「賽銭箱」を刻印表示（展示を商品らしく）
-    if(bigNode){ bigNode.updateWorldMatrix(true,false);
-      const wb=new THREE.Box3().setFromObject(bigNode),ws=new THREE.Vector3(),wc=new THREE.Vector3(); wb.getSize(ws); wb.getCenter(wc);
-      const W=Math.max(ws.x,0.02),H=Math.max(ws.y,0.02);
-      const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex('賽銭箱',W/H),transparent:true,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
-      pl.position.set(wc.x,wc.y,wb.max.z+0.004); pl.renderOrder=3; scene.add(pl);
-    }
+    // 通常状態（前面「賽銭箱」＋額束「開運」）を竹面に密着配置（傾きに追従）
+    const rc=new THREE.Raycaster();
+    engNodes.forEach(({node,cfg})=>{
+      node.updateWorldMatrix(true,false);
+      const wp=new THREE.Vector3(),wq=new THREE.Quaternion(),wsc=new THREE.Vector3(); node.matrixWorld.decompose(wp,wq,wsc);
+      const W=Math.max(Math.abs(wsc.x)*2*cfg.ps,0.02),H=Math.max(Math.abs(wsc.y)*2*cfg.ps,0.02);
+      let n=new THREE.Vector3(0,0,1).applyQuaternion(wq); if(n.z<0) n.negate(); n.normalize();
+      const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),n);
+      rc.set(wp.clone().addScaledVector(n,0.35), n.clone().negate());
+      const hit=rc.intersectObject(g,true)[0];
+      const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n,0.003);
+      const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      pl.quaternion.copy(q); pl.position.copy(pos); pl.renderOrder=3; scene.add(pl);
+    });
     const lab=labelSprite(p.name,p.price); lab.position.set(p.pos[0],PED_TOP+size.y*sc+0.5,p.pos[1]); scene.add(lab);
     items.push({name:p.name,price:p.price,url:p.url,x:p.pos[0],z:p.pos[1]});
     loaded++; document.getElementById('barFill').style.width=Math.round(loaded/PRODUCTS.length*100)+'%';
