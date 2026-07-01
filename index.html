@@ -105,12 +105,12 @@
 <div id="loader"><div class="ring"></div><div class="t" id="lt">竹を削り出しています…</div></div>
 
 <div id="status">ドラッグで回して、右のパネルで名入れ・仕上げをカスタム</div>
-<div id="spin" class="on">⟳ 自動回転</div>
+<div id="spin">⟳ 自動回転</div>
 
 <!-- customize dock -->
 <div id="dock" style="display:none">
   <h3>あなただけの一台に</h3>
-  <div class="sub">木・竹集成材／刻印・名入れ無料・受注生産（大分・自社工場）</div>
+  <div class="sub">竹集成材／刻印・名入れ無料・受注生産（大分・自社工場）</div>
 
   <div class="grp">
     <div class="lab"><span class="jp">名入れ・刻印</span> ENGRAVING</div>
@@ -123,15 +123,10 @@
     <div class="opts" id="fonts"></div>
   </div>
 
-  <div class="grp">
-    <div class="lab"><span class="jp">刻印色</span> STYLE</div>
-    <div class="sw" id="engcolors"></div>
-  </div>
-
   <div class="grp" style="margin-bottom:0">
-    <div class="lab"><span class="jp">素材・仕上げ</span> MATERIAL</div>
+    <div class="lab"><span class="jp">素材</span> MATERIAL</div>
     <div class="opts" id="finishes"></div>
-    <div class="hintx">実物大 約150×85×163mm・完成品（500円玉 約40枚収納）</div>
+    <div class="hintx">竹集成材（素地）・大分自社工場／実物大 約150×85×163mm・完成品（500円玉 約40枚収納）</div>
   </div>
 </div>
 
@@ -160,15 +155,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ---------- options ----------
 const FONTS=[{n:'明朝',css:'"Shippori Mincho B1", serif'},{n:'古印',css:'"Zen Old Mincho", serif'},{n:'ゴシック',css:'"Zen Kaku Gothic New", sans-serif'}];
-const ENGC=[{n:'焼き（濃）',c:'#3a2a16'},{n:'白木（淡）',c:'#f3e8cf'},{n:'金',c:'#b8892f'}];
+const ENGC=[{n:'茶',c:'#5a3a1a'}];                                  // 刻印色は茶色のみ
 // 素材・仕上げ（実物大 約150×85×163mm・完成品／受注生産）※価格は目安
 const FINISHES=[
-  {n:'木・標準',  note:'シナ材（ki-gu-mi標準）', base:0xe6cd94, price:3800},
-  {n:'竹・素地',  note:'竹集成材・大分',         base:0xd8b878, price:6800},
-  {n:'竹・炭化',  note:'竹集成材・大分',         base:0xa87b45, price:8800},
-  {n:'竹・漆塗り',note:'竹集成材×漆',           base:0x6e4523, price:14800}
+  {n:'竹・素地',  note:'竹集成材・大分',         base:0xd8b878, price:6800}   // 竹の素地のみ
 ];
-let fontIdx=0, engIdx=0, finIdx=1, engText='';
+let fontIdx=0, engIdx=0, finIdx=0, engText='賽銭箱';                 // 標準で「賽銭箱」を刻印
 const yen=n=>'¥'+n.toLocaleString();
 const price=()=>FINISHES[finIdx].price;
 const specText=()=>`${FINISHES[finIdx].n}`+(engText?`・「${engText}」`:'');
@@ -191,10 +183,10 @@ scene.background=bg;
 const pmrem=new THREE.PMREMGenerator(renderer); scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
 scene.add(new THREE.HemisphereLight(0xfff4e0,0x6b6250,0.7));
 scene.add(new THREE.AmbientLight(0xffffff,0.35));
-const key=new THREE.DirectionalLight(0xfff3df,2.3); key.position.set(4,7,5); key.castShadow=true;
+const key=new THREE.DirectionalLight(0xfff3df,2.5); key.position.set(1.5,6,9); key.castShadow=true;  // 正面（+Z）＋上から
 key.shadow.mapSize.set(2048,2048); key.shadow.camera.near=1; key.shadow.camera.far=40; key.shadow.bias=-0.0004;
 key.shadow.camera.left=-6;key.shadow.camera.right=6;key.shadow.camera.top=6;key.shadow.camera.bottom=-6; scene.add(key);
-const fill=new THREE.DirectionalLight(0xffffff,0.5); fill.position.set(-5,3,-2); scene.add(fill);
+const fill=new THREE.DirectionalLight(0xffffff,0.45); fill.position.set(-5,3,5); scene.add(fill);        // 正面寄りの補助光
 
 // ground shadow
 const ground=new THREE.Mesh(new THREE.CircleGeometry(40,48),new THREE.ShadowMaterial({opacity:0.28}));
@@ -301,6 +293,7 @@ new STLLoader().load('models/saisen.stl', geo=>{
   document.getElementById('dock').style.display='block';
   document.getElementById('bar').style.display='flex';
   document.getElementById('hint').style.display='block'; setTimeout(()=>document.getElementById('hint').style.display='none',4500);
+  document.getElementById('nameIn').value=engText; refreshName();   // 標準で「賽銭箱」を刻印表示
   renderUI(); refreshBar();
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
@@ -313,7 +306,6 @@ function chip(wrap,arr,cur,fn,label){ wrap.innerHTML=''; arr.forEach((o,i)=>{ co
 function renderUI(){
   chip(document.getElementById('fonts'),FONTS,fontIdx,i=>{fontIdx=i;renderUI();refreshName();},o=>o.n);
   chip(document.getElementById('finishes'),FINISHES,finIdx,i=>{finIdx=i;renderUI();applyFinish();refreshBar();},o=>`${o.n}<br><small>${yen(o.price)}</small>`);
-  const ec=document.getElementById('engcolors'); ec.innerHTML=''; ENGC.forEach((c,i)=>{const s=document.createElement('div');s.className='swx'+(i===engIdx?' sel':'');s.style.background=c.c;s.title=c.n;s.onclick=()=>{engIdx=i;renderUI();refreshName();};ec.appendChild(s);});
 }
 document.getElementById('nameIn').addEventListener('input',e=>{ engText=e.target.value.trim(); refreshName(); refreshBar(); });
 function refreshBar(){ document.getElementById('barSpec').textContent=specText(); document.getElementById('barPrice').innerHTML=yen(price())+' <small>〜</small>'; }
@@ -365,7 +357,7 @@ function stepDone(){ mTitle.textContent='COMPLETE';
 }
 
 // ---------- loop ----------
-let spin=true; const clock=new THREE.Clock();
+let spin=false; const clock=new THREE.Clock();
 function animate(){ requestAnimationFrame(animate);
   const dt=clock.getDelta();
   if(spin && boxMesh) holder.rotation.y+=dt*0.4;
