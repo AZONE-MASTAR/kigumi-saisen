@@ -278,12 +278,19 @@ new STLLoader().load('models/saisen.stl', geo=>{
   boxMesh.position.y=BASE_TOP+(size.y*sc)/2;
   holder.add(boxMesh); holder.updateMatrixWorld(true);
   boxHalfZ=(size.z*sc)/2; boxTopY=BASE_TOP+size.y*sc; boxW=size.x*sc;
-  // 名入れ面：前面パネルの実表面をレイキャストで検出し、そこにピッタリ貼り付ける（土台の張り出しに関係なく面に密着）
+  // 名入れ面：前面パネルの実表面をレイキャストで検出。左右にサンプルして「箱本体の中心」を求め、そこに密着配置（bbox中心のズレを補正）
   const nameY=BASE_TOP+size.y*sc*0.225;
-  const rc=new THREE.Raycaster(); rc.set(new THREE.Vector3(0,nameY,boxHalfZ+5), new THREE.Vector3(0,0,-1));
-  const hit=rc.intersectObject(boxMesh,true); const nameZ=(hit.length?hit[0].point.z:boxHalfZ)+0.004;
+  const rc=new THREE.Raycaster();
+  let minHX=Infinity,maxHX=-Infinity;
+  for(let sx=-boxW*0.55; sx<=boxW*0.55; sx+=boxW*0.02){
+    rc.set(new THREE.Vector3(sx,nameY,boxHalfZ+5), new THREE.Vector3(0,0,-1));
+    if(rc.intersectObject(boxMesh,true).length){ if(sx<minHX)minHX=sx; if(sx>maxHX)maxHX=sx; }
+  }
+  const panelCX = (minHX===Infinity)?0:(minHX+maxHX)/2;      // 前面パネルの左右中心
+  rc.set(new THREE.Vector3(panelCX,nameY,boxHalfZ+5), new THREE.Vector3(0,0,-1));
+  const hz=rc.intersectObject(boxMesh,true); const nameZ=(hz.length?hz[0].point.z:boxHalfZ)+0.004;
   const np=new THREE.Mesh(new THREE.PlaneGeometry(boxW*0.60, boxW*0.60*0.30), new THREE.MeshStandardMaterial({transparent:true, roughness:0.6, metalness:0}));
-  np.position.set(0, nameY, nameZ); np.visible=false; nameMesh=np; holder.add(np);
+  np.position.set(panelCX, nameY, nameZ); np.visible=false; nameMesh=np; holder.add(np);
   controls.target.set(0, BASE_TOP+size.y*sc*0.5, 0);
   camera.position.set(0, BASE_TOP+size.y*sc*0.62, Math.max(5, size.y*sc*2.0));
   controls.update();
