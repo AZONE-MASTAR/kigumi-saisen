@@ -49,9 +49,9 @@
   .sw{display:flex;gap:8px;flex-wrap:wrap}
   .swx{width:30px;height:30px;border-radius:8px;cursor:pointer;border:2px solid transparent;outline:1px solid rgba(0,0,0,.12)}
   .swx.sel{border-color:var(--ink)}
-  #nameIn{width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:15px;font-family:var(--mincho);color:var(--ink);outline:none}
-  #nameIn:focus{border-color:var(--accent)}
-  #nameIn::placeholder{color:#c3bba9;font-family:var(--sans)}
+  #engFields input{width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:15px;font-family:var(--mincho);color:var(--ink);outline:none}
+  #engFields input:focus{border-color:var(--accent)}
+  #engFields input::placeholder{color:#c3bba9;font-family:var(--sans)}
   .hintx{font-size:10.5px;color:var(--muted);margin-top:6px}
 
   /* order bar */
@@ -113,9 +113,9 @@
   <div class="sub">竹集成材／刻印・名入れ無料・受注生産（大分・自社工場）</div>
 
   <div class="grp">
-    <div class="lab"><span class="jp">名入れ・刻印</span> ENGRAVING</div>
-    <input id="nameIn" maxlength="12" placeholder="例：〇〇神社／山田家" />
-    <div class="hintx">前面にレーザー刻印されます（12文字まで）</div>
+    <div class="lab"><span class="jp">名入れ・刻印</span> ENGRAVING <span style="color:var(--accent-d);font-size:11px">3箇所・無料</span></div>
+    <div id="engFields"></div>
+    <div class="hintx">前面の大きな板＋鳥居の額束（2文字）に無料でレーザー刻印します</div>
   </div>
 
   <div class="grp">
@@ -155,15 +155,22 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // ---------- options ----------
 const FONTS=[{n:'明朝',css:'"Shippori Mincho B1", serif'},{n:'古印',css:'"Zen Old Mincho", serif'},{n:'ゴシック',css:'"Zen Kaku Gothic New", sans-serif'}];
-const ENGC=[{n:'茶',c:'#5a3a1a'}];                                  // 刻印色は茶色のみ
+const ENG_COLOR='#5a3a1a';                                          // 刻印色は茶色のみ
 // 素材・仕上げ（実物大 約150×85×163mm・完成品／受注生産）※価格は目安
 const FINISHES=[
   {n:'竹・素地',  note:'竹集成材・大分',         base:0xd8b878, price:6800}   // 竹の素地のみ
 ];
-let fontIdx=0, engIdx=0, finIdx=0, engText='賽銭箱';                 // 標準で「賽銭箱」を刻印
+// 刻印スロット（GLBのノード名で対応付け）：前面の大きな板＋鳥居の額束に2つの一文字
+const ENGRAVINGS=[
+  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱'},
+  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:''},
+  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:''}
+];
+let fontIdx=0, finIdx=0;
+const engVal={}; ENGRAVINGS.forEach(e=>engVal[e.id]=e.def);         // 標準で前面に「賽銭箱」
 const yen=n=>'¥'+n.toLocaleString();
 const price=()=>FINISHES[finIdx].price;
-const specText=()=>`${FINISHES[finIdx].n}`+(engText?`・「${engText}」`:'');
+const specText=()=>`${FINISHES[finIdx].n}`+(engVal.main?`・「${engVal.main}」`:'');
 
 // ---------- three ----------
 const scene=new THREE.Scene();
@@ -237,59 +244,65 @@ function triplanarUV(geo, scale){
   geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
 }
 
-// ---------- name engraving plane ----------
-let nameMesh=null, boxHalfZ=0, boxTopY=0, boxW=1;
-function makeNameTex(){
-  const cv=document.createElement('canvas'); cv.width=1024; cv.height=256; const x=cv.getContext('2d');
-  x.clearRect(0,0,1024,256);
-  if(engText){ x.fillStyle=ENGC[engIdx].c; x.textAlign='center'; x.textBaseline='middle';
-    let fs=150; x.font=`700 ${fs}px ${FONTS[fontIdx].css}`;
-    while(x.measureText(engText).width>940 && fs>40){ fs-=6; x.font=`700 ${fs}px ${FONTS[fontIdx].css}`; }
-    // slight engraved shadow
+// ---------- engraving planes (3 slots) ----------
+function makeEngTex(text, aspect){
+  const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  x.clearRect(0,0,W,H);
+  if(text){ x.fillStyle=ENG_COLOR; x.textAlign='center'; x.textBaseline='middle';
+    let fs=Math.round(H*0.74); x.font=`700 ${fs}px ${FONTS[fontIdx].css}`;
+    const maxW=W*0.90;
+    while(x.measureText(text).width>maxW && fs>18){ fs-=4; x.font=`700 ${fs}px ${FONTS[fontIdx].css}`; }
     x.shadowColor='rgba(0,0,0,0.35)'; x.shadowBlur=4; x.shadowOffsetY=2;
-    x.fillText(engText,512,138);
+    x.fillText(text, W/2, H*0.54);
   }
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
-function refreshName(){
-  if(!nameMesh) return;
-  nameMesh.material.map=makeNameTex(); nameMesh.material.needsUpdate=true;
-  nameMesh.visible=!!engText;
+function refreshEng(){
+  ENGRAVINGS.forEach(e=>{ if(!e.plane) return;
+    e.plane.material.map=makeEngTex(engVal[e.id], e.aspect); e.plane.material.needsUpdate=true;
+    e.plane.visible=!!engVal[e.id];
+  });
 }
 
 // ---------- load model ----------
-let boxMesh=null, boxMat=null;
-function cropX(geo, split, keepGreater){
-  const pos=geo.attributes.position, n=pos.count, out=[];
-  for(let i=0;i<n;i+=3){ const cx=(pos.getX(i)+pos.getX(i+1)+pos.getX(i+2))/3;
-    if((keepGreater&&cx>split)||(!keepGreater&&cx<split)){ for(let j=0;j<3;j++) out.push(pos.getX(i+j),pos.getY(i+j),pos.getZ(i+j)); } }
-  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(out,3)); return g;
-}
+let boxMat=null;
+const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooTex(FINISHES[finIdx].base), color:0xffffff, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
-  root.traverse(o=>{ if(o.isMesh){ o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42); o.material=boxMat; o.castShadow=true; o.receiveShadow=true; } });
+  // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)は退避してノード名で対応付け
+  const engNodes={};
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
+    if(eng){ engNodes[eng.id]=o; return; }
+    o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
+    o.material=boxMat; o.castShadow=true; o.receiveShadow=true;
+  });
   root.updateMatrixWorld(true);
-  const bb=new THREE.Box3().setFromObject(root), size=new THREE.Vector3(), ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
+  // 中心合わせ＆スケール（刻印板を除いた本体のみのbbox）
+  const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && !isEngNode(o)) bb.expandByObject(o); });
+  const size=new THREE.Vector3(), ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
   const boxGroup=new THREE.Group(); boxGroup.add(root); root.position.set(-ctr.x,-ctr.y,-ctr.z);   // bbox中心を原点へ
   const targetH=2.2, sc=targetH/Math.max(size.y,0.001);
   boxGroup.scale.setScalar(sc); boxGroup.position.y=BASE_TOP+(size.y*sc)/2;
   holder.add(boxGroup); holder.updateMatrixWorld(true);
-  boxMesh=boxGroup;                          // レイキャスト対象（再帰）
-  boxHalfZ=(size.z*sc)/2; boxTopY=BASE_TOP+size.y*sc; boxW=size.x*sc;
-  // 名入れ面：前面パネルの実表面をレイキャストで検出。左右にサンプルして「箱本体の中心」を求め、そこに密着配置（bbox中心のズレを補正）
-  const nameY=BASE_TOP+size.y*sc*0.225;
-  const rc=new THREE.Raycaster();
-  let minHX=Infinity,maxHX=-Infinity;
-  for(let sx=-boxW*0.55; sx<=boxW*0.55; sx+=boxW*0.02){
-    rc.set(new THREE.Vector3(sx,nameY,boxHalfZ+5), new THREE.Vector3(0,0,-1));
-    if(rc.intersectObject(boxMesh,true).length){ if(sx<minHX)minHX=sx; if(sx>maxHX)maxHX=sx; }
-  }
-  const panelCX = (minHX===Infinity)?0:(minHX+maxHX)/2;      // 前面パネルの左右中心
-  rc.set(new THREE.Vector3(panelCX,nameY,boxHalfZ+5), new THREE.Vector3(0,0,-1));
-  const hz=rc.intersectObject(boxMesh,true); const nameZ=(hz.length?hz[0].point.z:boxHalfZ)+0.004;
-  const np=new THREE.Mesh(new THREE.PlaneGeometry(boxW*0.60, boxW*0.60*0.30), new THREE.MeshStandardMaterial({transparent:true, roughness:0.6, metalness:0}));
-  np.position.set(panelCX, nameY, nameZ); np.visible=false; nameMesh=np; holder.add(np);
+  // 各刻印スロット：GLBで定義された位置・サイズに合わせ、前面(+Z)向きのテキスト面を配置
+  ENGRAVINGS.forEach(e=>{
+    const node=engNodes[e.id]; if(!node) return;
+    node.updateWorldMatrix(true,false);
+    const wb=new THREE.Box3().setFromObject(node);
+    const ws=new THREE.Vector3(), wc=new THREE.Vector3(); wb.getSize(ws); wb.getCenter(wc);
+    node.visible=false;                                        // プレースホルダのCubeは非表示
+    const W=Math.max(ws.x,0.02), H=Math.max(ws.y,0.02);
+    e.aspect=W/H;
+    const mat=new THREE.MeshStandardMaterial({transparent:true, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
+    plane.position.set(wc.x, wc.y, wb.max.z+0.006);            // 前面のわずか手前
+    plane.renderOrder=3; plane.visible=false;
+    holder.add(plane); e.plane=plane;
+  });
   controls.target.set(0, BASE_TOP+size.y*sc*0.5, 0);
   camera.position.set(0, BASE_TOP+size.y*sc*0.62, Math.max(5, size.y*sc*2.0));
   controls.update();
@@ -299,7 +312,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   document.getElementById('dock').style.display='block';
   document.getElementById('bar').style.display='flex';
   document.getElementById('hint').style.display='block'; setTimeout(()=>document.getElementById('hint').style.display='none',4500);
-  document.getElementById('nameIn').value=engText; refreshName();   // 標準で「賽銭箱」を刻印表示
+  buildEngFields(); refreshEng();                              // 3スロットのUI生成＋標準刻印表示
   renderUI(); refreshBar();
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
@@ -310,10 +323,19 @@ function applyFinish(){ if(boxMat){ boxMat.map=bambooTex(FINISHES[finIdx].base);
 function chip(wrap,arr,cur,fn,label){ wrap.innerHTML=''; arr.forEach((o,i)=>{ const b=document.createElement('div'); b.className='opt'+(i===cur?' sel':'');
   b.innerHTML=label(o); b.onclick=()=>fn(i); wrap.appendChild(b); }); }
 function renderUI(){
-  chip(document.getElementById('fonts'),FONTS,fontIdx,i=>{fontIdx=i;renderUI();refreshName();},o=>o.n);
+  chip(document.getElementById('fonts'),FONTS,fontIdx,i=>{fontIdx=i;renderUI();refreshEng();},o=>o.n);
   chip(document.getElementById('finishes'),FINISHES,finIdx,i=>{finIdx=i;renderUI();applyFinish();refreshBar();},o=>`${o.n}<br><small>${yen(o.price)}</small>`);
 }
-document.getElementById('nameIn').addEventListener('input',e=>{ engText=e.target.value.trim(); refreshName(); refreshBar(); });
+function buildEngFields(){
+  const box=document.getElementById('engFields'); if(!box) return; box.innerHTML='';
+  ENGRAVINGS.forEach(e=>{
+    const w=document.createElement('div'); w.style.marginBottom='9px';
+    w.innerHTML=`<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 3px">${e.label}</label>`
+      +`<input id="in_${e.id}" maxlength="${e.max}" placeholder="${e.ph}" value="${engVal[e.id]}" style="width:100%">`;
+    box.appendChild(w);
+    w.querySelector('input').addEventListener('input',ev=>{ engVal[e.id]=ev.target.value.trim(); refreshEng(); refreshBar(); });
+  });
+}
 function refreshBar(){ document.getElementById('barSpec').textContent=specText(); document.getElementById('barPrice').innerHTML=yen(price())+' <small>〜</small>'; }
 document.getElementById('spin').addEventListener('click',function(){ spin=!spin; this.classList.toggle('on',spin); });
 
@@ -336,7 +358,7 @@ function stepShip(){ mTitle.textContent='お届け先';
   mBody.innerHTML=`<div class="steps"><i class="on"></i><i class="on"></i><i></i></div>
    <div class="grid2"><div class="fld"><label>姓</label><input placeholder="山田"></div><div class="fld"><label>名</label><input placeholder="太郎"></div></div>
    <div class="fld"><label>メール</label><input type="email" placeholder="you@example.com"></div>
-   <div class="fld"><label>刻印内容の確認</label><input value="${engText||'（なし）'}" readonly></div>
+   <div class="fld"><label>刻印内容の確認（前面／額束①②）</label><input value="${[engVal.main,engVal.seal1,engVal.seal2].filter(Boolean).join(' ／ ')||'（なし）'}" readonly></div>
    <div class="fld"><label>ご住所</label><input placeholder="大分県…"></div>
    <div class="act"><button class="btn ghost" id="bk">←</button><button class="btn go" id="toConf">確認へ →</button></div>
    <div class="dn">入力はデモ用です。実際の送信・決済は行われません。</div>`;
@@ -366,7 +388,7 @@ function stepDone(){ mTitle.textContent='COMPLETE';
 let spin=false; const clock=new THREE.Clock();
 function animate(){ requestAnimationFrame(animate);
   const dt=clock.getDelta();
-  if(spin && boxMesh) holder.rotation.y+=dt*0.4;
+  if(spin) holder.rotation.y+=dt*0.4;
   controls.update(); renderer.render(scene,camera);
 }
 animate();

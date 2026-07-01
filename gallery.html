@@ -166,19 +166,42 @@ function cropX(geo,split,keepGreater){
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(out,3));return g;
 }
 
+// 展示用の刻印テクスチャ（茶色文字・透明背景）
+function engTex(text,aspect){
+  const W=1024,H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  x.clearRect(0,0,W,H); x.fillStyle='#5a3a1a'; x.textAlign='center'; x.textBaseline='middle';
+  let fs=Math.round(H*0.74); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
+  while(x.measureText(text).width>W*0.9 && fs>18){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
+  x.shadowColor='rgba(0,0,0,0.35)'; x.shadowBlur=4; x.shadowOffsetY=2; x.fillText(text,W/2,H*0.54);
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');
 const items=[];   // {name,price,url,x,z}
 const loader=new GLTFLoader(); let loaded=0;
 PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
   loader.load(p.file, gltf=>{
     const root=gltf.scene;
     const mat=new THREE.MeshStandardMaterial({map:bambooTex(p.base),roughness:0.62,metalness:0.02,envMapIntensity:0.7});
-    root.traverse(o=>{ if(o.isMesh){ o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=mat; o.castShadow=true; } });
+    let bigNode=null;
+    root.traverse(o=>{ if(!o.isMesh) return;
+      if(isEng(o)){ o.visible=false; if(o.name.includes('大きな')) bigNode=o; return; }   // 刻印プレースホルダは非表示
+      o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=mat; o.castShadow=true;
+    });
     root.updateMatrixWorld(true);
-    const bb=new THREE.Box3().setFromObject(root),size=new THREE.Vector3(),ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
+    const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });   // 本体のみ
+    const size=new THREE.Vector3(),ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
     const g=new THREE.Group(); g.add(root); root.position.set(-ctr.x,-ctr.y,-ctr.z);
     const targetH=1.35, sc=targetH/Math.max(size.y,0.001);
     g.scale.setScalar(sc); g.position.set(p.pos[0],PED_TOP+size.y*sc/2,p.pos[1]);
-    scene.add(g);
+    scene.add(g); g.updateMatrixWorld(true);
+    // 前面に「賽銭箱」を刻印表示（展示を商品らしく）
+    if(bigNode){ bigNode.updateWorldMatrix(true,false);
+      const wb=new THREE.Box3().setFromObject(bigNode),ws=new THREE.Vector3(),wc=new THREE.Vector3(); wb.getSize(ws); wb.getCenter(wc);
+      const W=Math.max(ws.x,0.02),H=Math.max(ws.y,0.02);
+      const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex('賽銭箱',W/H),transparent:true,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      pl.position.set(wc.x,wc.y,wb.max.z+0.004); pl.renderOrder=3; scene.add(pl);
+    }
     const lab=labelSprite(p.name,p.price); lab.position.set(p.pos[0],PED_TOP+size.y*sc+0.5,p.pos[1]); scene.add(lab);
     items.push({name:p.name,price:p.price,url:p.url,x:p.pos[0],z:p.pos[1]});
     loaded++; document.getElementById('barFill').style.width=Math.round(loaded/PRODUCTS.length*100)+'%';
