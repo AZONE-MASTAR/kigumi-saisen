@@ -186,10 +186,13 @@ PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
   loader.load(p.file, gltf=>{
     const root=gltf.scene;
     const mat=new THREE.MeshStandardMaterial({map:bambooTex(p.base),roughness:0.62,metalness:0.02,envMapIntensity:0.7});
+    const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0x6a451f),roughness:0.6,metalness:0.03,envMapIntensity:0.55});   // 「茶色」＝橙マテリアルの部位
+    const isBrownM=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
     let bigNode=null;
     root.traverse(o=>{ if(!o.isMesh) return;
       if(isEng(o)){ o.visible=false; if(o.name.includes('大きな')) bigNode=o; return; }   // 刻印プレースホルダは非表示
-      o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=mat; o.castShadow=true;
+      const brown=isBrownM(o);
+      o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=brown?brownMat:mat; o.castShadow=true;
     });
     root.updateMatrixWorld(true);
     const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });   // 本体のみ

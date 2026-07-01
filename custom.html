@@ -275,14 +275,18 @@ const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooTex(FINISHES[finIdx].base), color:0xffffff, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
+  // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0x6a451f), color:0xffffff, roughness:0.6, metalness:0.03, envMapIntensity:0.55});
+  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)は退避してノード名で対応付け
   const engNodes={};
   root.traverse(o=>{
     if(!o.isMesh) return;
     const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
     if(eng){ engNodes[eng.id]=o; return; }
+    const brown=isBrown(o);
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
-    o.material=boxMat; o.castShadow=true; o.receiveShadow=true;
+    o.material=brown?brownMat:boxMat; o.castShadow=true; o.receiveShadow=true;
   });
   root.updateMatrixWorld(true);
   // 中心合わせ＆スケール（刻印板を除いた本体のみのbbox）
