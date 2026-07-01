@@ -149,7 +149,7 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
@@ -265,18 +265,17 @@ function cropX(geo, split, keepGreater){
     if((keepGreater&&cx>split)||(!keepGreater&&cx<split)){ for(let j=0;j<3;j++) out.push(pos.getX(i+j),pos.getY(i+j),pos.getZ(i+j)); } }
   const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(out,3)); return g;
 }
-new STLLoader().load('models/saisen.stl', geo=>{
-  geo=cropX(geo,-90,true);                 // STLに2台入っているため、詳細な1台（右側）だけを表示
-  geo.rotateX(-Math.PI/2);                 // Rhino Z-up -> Y-up
-  geo.computeVertexNormals();
-  geo.computeBoundingBox(); const bb=geo.boundingBox, size=new THREE.Vector3(), ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
-  geo.translate(-ctr.x,-ctr.y,-ctr.z);
-  triplanarUV(geo, 1/42);                    // grain scale (model in mm)
-  const targetH=2.2, sc=targetH/Math.max(size.y,0.001);
+new GLTFLoader().load('models/saisen.glb', gltf=>{
+  const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooTex(FINISHES[finIdx].base), color:0xffffff, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
-  boxMesh=new THREE.Mesh(geo,boxMat); boxMesh.castShadow=true; boxMesh.receiveShadow=true; boxMesh.scale.setScalar(sc);
-  boxMesh.position.y=BASE_TOP+(size.y*sc)/2;
-  holder.add(boxMesh); holder.updateMatrixWorld(true);
+  root.traverse(o=>{ if(o.isMesh){ o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42); o.material=boxMat; o.castShadow=true; o.receiveShadow=true; } });
+  root.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(root), size=new THREE.Vector3(), ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
+  const boxGroup=new THREE.Group(); boxGroup.add(root); root.position.set(-ctr.x,-ctr.y,-ctr.z);   // bbox中心を原点へ
+  const targetH=2.2, sc=targetH/Math.max(size.y,0.001);
+  boxGroup.scale.setScalar(sc); boxGroup.position.y=BASE_TOP+(size.y*sc)/2;
+  holder.add(boxGroup); holder.updateMatrixWorld(true);
+  boxMesh=boxGroup;                          // レイキャスト対象（再帰）
   boxHalfZ=(size.z*sc)/2; boxTopY=BASE_TOP+size.y*sc; boxW=size.x*sc;
   // 名入れ面：前面パネルの実表面をレイキャストで検出。左右にサンプルして「箱本体の中心」を求め、そこに密着配置（bbox中心のズレを補正）
   const nameY=BASE_TOP+size.y*sc*0.225;
