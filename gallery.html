@@ -170,10 +170,13 @@ function cropX(geo,split,keepGreater){
 function engTex(text,aspect){
   const W=1024,H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  x.clearRect(0,0,W,H); x.fillStyle='#5a3a1a'; x.textAlign='center'; x.textBaseline='middle';
-  let fs=Math.round(H*0.74); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
-  while(x.measureText(text).width>W*0.9 && fs>18){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
-  x.shadowColor='rgba(0,0,0,0.35)'; x.shadowBlur=4; x.shadowOffsetY=2; x.fillText(text,W/2,H*0.54);
+  x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';
+  let fs=Math.round(H*0.72); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
+  while(x.measureText(text).width>W*0.94 && fs>18){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
+  const cx=W/2, cy=H*0.54;
+  x.shadowColor='rgba(0,0,0,0.4)'; x.shadowBlur=4; x.shadowOffsetY=2;
+  x.lineJoin='round'; x.lineWidth=Math.max(2,fs*0.045); x.strokeStyle='#3a2410'; x.strokeText(text,cx,cy);
+  x.shadowColor='transparent'; x.fillStyle='#5a3a1a'; x.fillText(text,cx,cy);
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
 const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');

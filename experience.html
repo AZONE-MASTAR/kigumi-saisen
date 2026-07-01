@@ -162,9 +162,9 @@ const FINISHES=[
 ];
 // 刻印スロット（GLBのノード名で対応付け）：前面の大きな板＋鳥居の額束に2つの一文字
 const ENGRAVINGS=[
-  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱'},
-  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:''},
-  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:''}
+  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱', fill:0.72, weight:700, pscale:1.0},
+  {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：福',              max:1,  def:'',     fill:0.96, weight:900, pscale:1.18},
+  {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：寿',              max:1,  def:'',     fill:0.96, weight:900, pscale:1.18}
 ];
 let fontIdx=0, finIdx=0;
 const engVal={}; ENGRAVINGS.forEach(e=>engVal[e.id]=e.def);         // 標準で前面に「賽銭箱」
@@ -245,22 +245,26 @@ function triplanarUV(geo, scale){
 }
 
 // ---------- engraving planes (3 slots) ----------
-function makeEngTex(text, aspect){
+function makeEngTex(text, aspect, fill, weight){
+  fill=fill||0.72; weight=weight||700;
   const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
   x.clearRect(0,0,W,H);
-  if(text){ x.fillStyle=ENG_COLOR; x.textAlign='center'; x.textBaseline='middle';
-    let fs=Math.round(H*0.74); x.font=`700 ${fs}px ${FONTS[fontIdx].css}`;
-    const maxW=W*0.90;
-    while(x.measureText(text).width>maxW && fs>18){ fs-=4; x.font=`700 ${fs}px ${FONTS[fontIdx].css}`; }
-    x.shadowColor='rgba(0,0,0,0.35)'; x.shadowBlur=4; x.shadowOffsetY=2;
-    x.fillText(text, W/2, H*0.54);
+  if(text){ x.textAlign='center'; x.textBaseline='middle';
+    let fs=Math.round(H*fill); x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
+    const maxW=W*0.94;
+    while(x.measureText(text).width>maxW && fs>18){ fs-=4; x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
+    const cx=W/2, cy=H*0.54;
+    x.shadowColor='rgba(0,0,0,0.4)'; x.shadowBlur=4; x.shadowOffsetY=2;
+    // 濃い縁取りで彫り込み感を強め、茶色で塗る
+    x.lineJoin='round'; x.lineWidth=Math.max(2,fs*0.045); x.strokeStyle='#3a2410'; x.strokeText(text,cx,cy);
+    x.shadowColor='transparent'; x.fillStyle=ENG_COLOR; x.fillText(text,cx,cy);
   }
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
 function refreshEng(){
   ENGRAVINGS.forEach(e=>{ if(!e.plane) return;
-    e.plane.material.map=makeEngTex(engVal[e.id], e.aspect); e.plane.material.needsUpdate=true;
+    e.plane.material.map=makeEngTex(engVal[e.id], e.aspect, e.fill, e.weight); e.plane.material.needsUpdate=true;
     e.plane.visible=!!engVal[e.id];
   });
 }
@@ -295,7 +299,8 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
     const wb=new THREE.Box3().setFromObject(node);
     const ws=new THREE.Vector3(), wc=new THREE.Vector3(); wb.getSize(ws); wb.getCenter(wc);
     node.visible=false;                                        // プレースホルダのCubeは非表示
-    const W=Math.max(ws.x,0.02), H=Math.max(ws.y,0.02);
+    const ps=e.pscale||1;
+    const W=Math.max(ws.x,0.02)*ps, H=Math.max(ws.y,0.02)*ps;
     e.aspect=W/H;
     const mat=new THREE.MeshStandardMaterial({transparent:true, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
     const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
