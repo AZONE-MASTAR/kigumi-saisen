@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ki-gu-mi CUSTOM ─ 3Dギャラリーを歩く</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2a251d; --muted:#a99e88; --line:#4a4133; --accent:#7ba05b; --accent-d:#5c7d4c; --paper:#f3ecdd;
+    --mincho:"Shippori Mincho B1",serif; --old:"Zen Old Mincho",serif; --sans:"Zen Kaku Gothic New",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#1a1611;color:#f3ecdd;font-family:var(--sans);-webkit-font-smoothing:antialiased;user-select:none;touch-action:none}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #brand{position:fixed;top:15px;left:18px;z-index:35;font-family:var(--mincho);font-weight:700;font-size:16px;letter-spacing:.06em;color:#f3ecdd}
+  #brand .ac{color:var(--accent)}
+
+  #enter{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+         background:radial-gradient(120% 110% at 50% 0%,#2a231a,#14100b 72%);padding:40px 24px}
+  #enter .kick{font-weight:700;letter-spacing:.28em;font-size:11.5px;color:var(--accent);margin-bottom:14px}
+  #enter h1{font-family:var(--mincho);font-weight:700;font-size:clamp(28px,5.2vw,44px);line-height:1.35}
+  #enter h1 .ac{color:var(--accent)}
+  #enter p{color:#b8ac93;font-size:14.5px;margin-top:14px;max-width:40ch}
+  #enterBtn{margin-top:30px;background:var(--accent-d);color:#fff;border:none;border-radius:34px;padding:16px 38px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 14px 34px rgba(92,125,76,.4)}
+  #enterBtn[disabled]{opacity:.5}
+  #enter .ctrls{margin-top:20px;font-size:12px;color:#8a7f68}
+  #enter .home{margin-top:16px;font-size:12.5px}
+  #enter .home a{color:#b8ac93}
+  #bar{margin-top:18px;width:220px;max-width:70vw;height:5px;border-radius:4px;background:#3a3226;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+
+  .hud{position:fixed;z-index:20;display:none}
+  #top{top:14px;left:50%;transform:translateX(-50%);font-size:12.5px;background:rgba(30,25,18,.6);border:1px solid var(--line);border-radius:30px;padding:8px 18px;backdrop-filter:blur(10px);white-space:nowrap}
+  #exit{top:14px;right:16px;background:rgba(30,25,18,.6);border:1px solid var(--line);color:#f3ecdd;border-radius:30px;padding:9px 16px;font-size:12.5px;font-weight:600;cursor:pointer;backdrop-filter:blur(10px);text-decoration:none}
+  #cross{top:50%;left:50%;width:7px;height:7px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.45);pointer-events:none}
+  #prompt{bottom:120px;left:50%;transform:translateX(-50%);background:rgba(30,25,18,.82);border:1px solid var(--accent);border-radius:14px;padding:12px 20px;text-align:center;backdrop-filter:blur(10px);cursor:pointer}
+  #prompt .nm{font-family:var(--mincho);font-weight:700;font-size:16px}
+  #prompt .pr{font-size:12.5px;color:var(--accent);margin-top:2px}
+  #prompt .key{margin-top:7px;font-size:11.5px;color:#b8ac93}
+  #prompt .key b{color:#f3ecdd;background:#3a3226;border:1px solid var(--line);border-radius:5px;padding:1px 7px}
+  #hint{bottom:22px;left:50%;transform:translateX(-50%);font-size:11px;color:#b8ac93;background:rgba(30,25,18,.5);border:1px solid var(--line);border-radius:20px;padding:6px 15px;backdrop-filter:blur(8px)}
+
+  #mobile{position:fixed;inset:0;z-index:18;display:none;pointer-events:none}
+  #movepad{position:absolute;left:0;top:0;width:55%;height:100%;pointer-events:auto;touch-action:none}
+  #lookpad{position:absolute;right:0;top:0;width:45%;height:100%;pointer-events:auto;touch-action:none}
+  #joy{position:fixed;width:120px;height:120px;margin-left:-60px;margin-top:-60px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);pointer-events:none;display:none}
+  #knob{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="brand">ki-gu-mi <span class="ac">CUSTOM</span> ─ GALLERY</div>
+
+<div id="enter">
+  <div class="kick">WALK THE 3D GALLERY</div>
+  <h1>ギャラリーを、<span class="ac">歩いて</span>選ぶ。</h1>
+  <p>木と竹のクラフトが並ぶ展示空間へ。気になる一台に近づいて、名入れカスタムへ。</p>
+  <div id="bar"><i id="barFill"></i></div>
+  <button id="enterBtn" disabled>読み込み中…</button>
+  <div class="ctrls">PC：ドラッグで見回す・WASD/矢印で移動　／　スマホ：左で移動・右で見回す</div>
+  <div class="home"><a href="index.html">← サービス紹介へ戻る</a></div>
+</div>
+
+<div id="top" class="hud">ギャラリー ─ 気になる一台に近づいてみてください</div>
+<a id="exit" class="hud" href="index.html">← ホーム</a>
+<div id="cross" class="hud"></div>
+<div id="prompt" class="hud"><div class="nm">—</div><div class="pr">—</div><div class="key"><b>E</b> または タップで 詳細・カスタム</div></div>
+<div id="hint" class="hud">ドラッグで見回す・WASDで移動</div>
+
+<div id="mobile"><div id="movepad"></div><div id="lookpad"></div><div id="joy"><div id="knob"></div></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const yen=n=>'¥'+n.toLocaleString();
+// 商品定義（将来ここに追加すれば自動でギャラリーに並ぶ）
+const PRODUCTS=[
+  {id:'saisen', name:'ki-gu-mi 賽銭貯金箱', price:6800, file:'models/saisen.stl', rotX:-Math.PI/2, cropX:-90, base:0xd8b878, url:'custom.html', pos:[-3.2,-6]}
+];
+const COMING=[[3.2,-9.5],[-3.2,-13],[3.2,-16.5]];   // 将来商品用の空き台
+
+// ---------- three ----------
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x14100b);
+scene.fog=new THREE.Fog(0x14100b, 14, 34);
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,0.05,200);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+document.getElementById('app').appendChild(renderer.domElement);
+const pmrem=new THREE.PMREMGenerator(renderer); scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+
+// ---------- hall (warm wood gallery) ----------
+const HX=6, ZF=2, ZB=-19;
+const matFloor=new THREE.MeshStandardMaterial({color:0x4a3d2a,roughness:0.6,metalness:0.05});
+const matWall =new THREE.MeshStandardMaterial({color:0x2c2519,roughness:0.95});
+const matCeil =new THREE.MeshStandardMaterial({color:0x1d1811,roughness:0.95});
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(HX*2,ZF-ZB),matFloor); floor.rotation.x=-Math.PI/2; floor.position.z=(ZF+ZB)/2; floor.receiveShadow=true; scene.add(floor);
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(HX*2,ZF-ZB),matCeil); ceil.rotation.x=Math.PI/2; ceil.position.set(0,4,(ZF+ZB)/2); scene.add(ceil);
+function wall(w,h,x,y,z,ry){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),matWall);m.position.set(x,y,z);m.rotation.y=ry;m.receiveShadow=true;scene.add(m);}
+wall(HX*2,4,0,2,ZB,0); wall(HX*2,4,0,2,ZF,Math.PI); wall(ZF-ZB,4,-HX,2,(ZF+ZB)/2,Math.PI/2); wall(ZF-ZB,4,HX,2,(ZF+ZB)/2,-Math.PI/2);
+// warm ceiling lights
+for(let z=-1;z>ZB;z-=4){ const l=new THREE.PointLight(0xffe4b0,10,11,2); l.position.set(0,3.7,z); scene.add(l);
+  const s=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.05,0.35),new THREE.MeshStandardMaterial({color:0x2a2216,emissive:0xffcf82,emissiveIntensity:0.7})); s.position.set(0,3.95,z); scene.add(s); }
+scene.add(new THREE.HemisphereLight(0xffe9c8,0x1a140d,0.5));
+scene.add(new THREE.AmbientLight(0xffffff,0.2));
+
+// ---------- pedestal ----------
+const PR=0.34; const pedColliders=[];
+function labelSprite(name,price){
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=150; const x=cv.getContext('2d');
+  x.fillStyle='rgba(30,25,18,.85)'; x.strokeStyle='rgba(123,160,91,.8)'; x.lineWidth=3;
+  x.beginPath(); x.roundRect(6,6,500,138,16); x.fill(); x.stroke();
+  x.fillStyle='#f3ecdd'; x.textAlign='center'; x.font='700 46px "Shippori Mincho B1", serif'; x.fillText(name,256,64);
+  if(price){ x.fillStyle='#7ba05b'; x.font='500 34px "Zen Kaku Gothic New", sans-serif'; x.fillText(yen(price)+'〜',256,116); }
+  else { x.fillStyle='#a99e88'; x.font='500 30px "Zen Kaku Gothic New", sans-serif'; x.fillText('準備中',256,114); }
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false})); sp.scale.set(1.9,0.56,1); return sp;
+}
+function pedestal(x,z){
+  const g=new THREE.Group(); g.position.set(x,0,z);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.15,0.66,40),new THREE.MeshStandardMaterial({color:0x3a3020,roughness:0.55,metalness:0.1}));
+  body.position.y=0.33; body.castShadow=true; body.receiveShadow=true;
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(1.02,1.02,0.06,40),new THREE.MeshStandardMaterial({color:0x4a3d29,roughness:0.4}));
+  top.position.y=0.67; g.add(body,top); scene.add(g);
+  const sp=new THREE.SpotLight(0xfff0d0,26,8,Math.PI/6,0.4,1.3); sp.position.set(x,3.6,z); sp.target.position.set(x,0.9,z); scene.add(sp); scene.add(sp.target);
+  pedColliders.push({x,z,r:1.15}); return g;
+}
+const PED_TOP=0.70;
+
+// bamboo texture + triplanar UV (customizer と同じ)
+function bambooTex(baseHex){
+  const cv=document.createElement('canvas');cv.width=256;cv.height=512;const x=cv.getContext('2d');
+  x.fillStyle='#'+baseHex.toString(16).padStart(6,'0');x.fillRect(0,0,256,512);
+  const cols=8,cw=256/cols;
+  for(let c=0;c<cols;c++){ x.fillStyle='rgba(60,40,18,0.22)';x.fillRect(c*cw,0,1.4,512);
+    for(let g=0;g<6;g++){const gx=c*cw+2+Math.random()*(cw-4);x.strokeStyle=`rgba(70,48,20,${0.05+Math.random()*0.08})`;x.lineWidth=0.6+Math.random()*0.6;x.beginPath();x.moveTo(gx,0);x.bezierCurveTo(gx+2,170,gx-2,340,gx,512);x.stroke();}
+    if(Math.random()<0.7){const ny=60+Math.random()*400;x.strokeStyle='rgba(90,60,26,0.26)';x.lineWidth=1.5;x.beginPath();x.moveTo(c*cw+1,ny);x.lineTo(c*cw+cw-1,ny);x.stroke();} }
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;return t;
+}
+function triplanarUV(geo,scale){
+  const pos=geo.attributes.position,n=pos.count,uv=new Float32Array(n*2);
+  const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
+  for(let i=0;i<n;i+=3){A.fromBufferAttribute(pos,i);B.fromBufferAttribute(pos,i+1);C.fromBufferAttribute(pos,i+2);ab.subVectors(B,A);ac.subVectors(C,A);nr.crossVectors(ab,ac);
+    const ax=Math.abs(nr.x),ay=Math.abs(nr.y),az=Math.abs(nr.z),V=[A,B,C];
+    for(let j=0;j<3;j++){const v=V[j];let u,w; if(ay>=ax&&ay>=az){u=v.x;w=v.z;}else if(ax>=az){u=v.z;w=v.y;}else{u=v.x;w=v.y;} uv[(i+j)*2]=u*scale;uv[(i+j)*2+1]=w*scale;} }
+  geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+}
+function cropX(geo,split,keepGreater){
+  const pos=geo.attributes.position,n=pos.count,out=[];
+  for(let i=0;i<n;i+=3){const cx=(pos.getX(i)+pos.getX(i+1)+pos.getX(i+2))/3; if((keepGreater&&cx>split)||(!keepGreater&&cx<split)){for(let j=0;j<3;j++)out.push(pos.getX(i+j),pos.getY(i+j),pos.getZ(i+j));}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(out,3));return g;
+}
+
+const items=[];   // {name,price,url,x,z}
+const stl=new STLLoader(); let loaded=0;
+PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
+  stl.load(p.file, geo=>{
+    if(p.cropX!=null) geo=cropX(geo,p.cropX,true);
+    if(p.rotX)geo.rotateX(p.rotX); geo.computeVertexNormals();
+    geo.computeBoundingBox(); const size=new THREE.Vector3(),ctr=new THREE.Vector3(); geo.boundingBox.getSize(size); geo.boundingBox.getCenter(ctr);
+    geo.translate(-ctr.x,-ctr.y,-ctr.z); triplanarUV(geo,1/42);
+    const targetH=1.35, sc=targetH/Math.max(size.y,0.001);
+    const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:bambooTex(p.base),roughness:0.62,metalness:0.02,envMapIntensity:0.7}));
+    mesh.castShadow=true; mesh.scale.setScalar(sc); mesh.position.set(p.pos[0],PED_TOP+size.y*sc/2,p.pos[1]);
+    scene.add(mesh);
+    const lab=labelSprite(p.name,p.price); lab.position.set(p.pos[0],PED_TOP+size.y*sc+0.5,p.pos[1]); scene.add(lab);
+    items.push({name:p.name,price:p.price,url:p.url,x:p.pos[0],z:p.pos[1]});
+    loaded++; document.getElementById('barFill').style.width=Math.round(loaded/PRODUCTS.length*100)+'%';
+    if(loaded===PRODUCTS.length){ const b=document.getElementById('enterBtn'); b.disabled=false; b.textContent='▶ ギャラリーに入る'; }
+  }, undefined, e=>console.error(e));
+});
+COMING.forEach(c=>{ pedestal(c[0],c[1]); const lab=labelSprite('準備中',0); lab.position.set(c[0],1.5,c[1]); scene.add(lab); });
+
+// ---------- controls ----------
+let px=0,pz=0,yaw=0,pitch=0,started=false;
+const keys={}; addEventListener('keydown',e=>{keys[e.code]=true; if(e.code==='KeyE'&&started&&activeItem) go(activeItem);}); addEventListener('keyup',e=>{keys[e.code]=false;});
+const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+let dragging=false,dpx=0,dpy=0;
+renderer.domElement.addEventListener('mousedown',e=>{ if(!started||isTouch)return; dragging=true;dpx=e.clientX;dpy=e.clientY; });
+addEventListener('mouseup',()=>dragging=false);
+addEventListener('mousemove',e=>{ if(!dragging)return; yaw-=(e.clientX-dpx)*0.004; pitch-=(e.clientY-dpy)*0.004; pitch=Math.max(-1.1,Math.min(1.1,pitch)); dpx=e.clientX;dpy=e.clientY; });
+const move={x:0,z:0};
+if(isTouch){
+  const joy=document.getElementById('joy'),knob=document.getElementById('knob'),mp=document.getElementById('movepad');let jid=null,ox=0,oy=0;
+  mp.addEventListener('touchstart',e=>{const t=e.changedTouches[0];jid=t.identifier;ox=t.clientX;oy=t.clientY;joy.style.left=ox+'px';joy.style.top=oy+'px';joy.style.display='block';knob.style.transform='translate(0,0)';e.preventDefault();},{passive:false});
+  mp.addEventListener('touchmove',e=>{for(const t of e.changedTouches){if(t.identifier===jid){let dx=t.clientX-ox,dy=t.clientY-oy;const mx=44,d=Math.hypot(dx,dy);if(d>mx){dx*=mx/d;dy*=mx/d;}knob.style.transform=`translate(${dx}px,${dy}px)`;move.x=dx/mx;move.z=dy/mx;}}e.preventDefault();},{passive:false});
+  const ej=e=>{for(const t of e.changedTouches){if(t.identifier===jid){jid=null;move.x=0;move.z=0;joy.style.display='none';}}};
+  mp.addEventListener('touchend',ej);mp.addEventListener('touchcancel',ej);
+  const lp=document.getElementById('lookpad');let lid=null,lx=0,ly=0;
+  lp.addEventListener('touchstart',e=>{const t=e.changedTouches[0];lid=t.identifier;lx=t.clientX;ly=t.clientY;e.preventDefault();},{passive:false});
+  lp.addEventListener('touchmove',e=>{for(const t of e.changedTouches){if(t.identifier===lid){yaw-=(t.clientX-lx)*0.005;pitch-=(t.clientY-ly)*0.005;pitch=Math.max(-1.1,Math.min(1.1,pitch));lx=t.clientX;ly=t.clientY;}}e.preventDefault();},{passive:false});
+  const el=e=>{for(const t of e.changedTouches){if(t.identifier===lid)lid=null;}};
+  lp.addEventListener('touchend',el);lp.addEventListener('touchcancel',el);
+}
+function enterGallery(){ started=true; px=0;pz=0;yaw=0;pitch=0;
+  document.getElementById('enter').style.display='none';
+  document.querySelectorAll('.hud').forEach(e=>e.style.display='block');
+  document.getElementById('prompt').style.display='none';
+  if(isTouch) document.getElementById('mobile').style.display='block';
+  document.getElementById('hint').textContent=isTouch?'左で移動・右で見回す・近づいてタップ':'ドラッグで見回す・WASDで移動・近づいてE';
+  setTimeout(()=>document.getElementById('hint').style.display='none',5000);
+}
+document.getElementById('enterBtn').addEventListener('click',()=>{ if(!document.getElementById('enterBtn').disabled) enterGallery(); });
+document.getElementById('prompt').addEventListener('click',()=>{ if(activeItem) go(activeItem); });
+function go(it){ if(it.url) window.location.href=it.url; }
+
+let activeItem=null;
+function updateProximity(){
+  let best=null,bd=3.2;
+  for(const it of items){ const d=Math.hypot(px-it.x,pz-it.z); if(d<bd){bd=d;best=it;} }
+  activeItem=best; const pr=document.getElementById('prompt');
+  if(best){ pr.style.display='block'; pr.querySelector('.nm').textContent=best.name; pr.querySelector('.pr').textContent=yen(best.price)+'〜'; } else pr.style.display='none';
+}
+
+const clock=new THREE.Clock();
+function animate(){ requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
+  if(started){
+    let mx=0,mz=0;
+    if(isTouch){ mx=move.x; mz=-move.z; }
+    else { if(keys['KeyW']||keys['ArrowUp'])mz+=1; if(keys['KeyS']||keys['ArrowDown'])mz-=1; if(keys['KeyA']||keys['ArrowLeft'])mx-=1; if(keys['KeyD']||keys['ArrowRight'])mx+=1; }
+    if(mx||mz){ const l=Math.hypot(mx,mz)||1; mx/=l; mz/=l; const sp=3.0*dt;
+      const vx=(-Math.sin(yaw)*mz+Math.cos(yaw)*mx)*sp, vz=(-Math.cos(yaw)*mz-Math.sin(yaw)*mx)*sp;
+      let nx=px+vx,nz=pz+vz;
+      nx=Math.max(-HX+PR,Math.min(HX-PR,nx)); nz=Math.max(ZB+PR,Math.min(ZF-PR,nz));
+      for(const c of pedColliders){ const dx=nx-c.x,dz=nz-c.z,d=Math.hypot(dx,dz),rr=c.r+PR; if(d<rr&&d>1e-4){nx=c.x+dx/d*rr;nz=c.z+dz/d*rr;} }
+      px=nx; pz=nz;
+    }
+    updateProximity();
+  }
+  camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch; camera.position.set(px,1.55,pz);
+  renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
