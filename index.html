@@ -49,6 +49,21 @@
   .btn-ghost{border:1px solid var(--line);color:var(--ink);background:var(--panel)}
   .btn-ghost:hover{border-color:var(--accent)}
 
+  .hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:40px;align-items:center}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr}}
+  .hero3d{position:relative;aspect-ratio:1/1;max-height:460px;border-radius:26px;overflow:hidden;
+    background:radial-gradient(90% 100% at 50% 16%,#f8f2e3,#e1d4b4);border:1px solid var(--line);box-shadow:0 30px 60px rgba(80,60,25,.16)}
+  @media(max-width:900px){.hero3d{aspect-ratio:1.2/1;max-height:340px;margin-top:30px}}
+  #hero3d-mount{position:absolute;inset:0}
+  #hero3d-mount canvas{display:block;width:100%!important;height:100%!important}
+  .h3d-badge{position:absolute;top:14px;left:16px;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--accent-d);background:rgba(255,253,248,.85);padding:6px 12px;border-radius:20px;pointer-events:none}
+  .h3d-cta{position:absolute;top:14px;right:16px;font-size:12px;font-weight:700;color:#fff;background:var(--accent);padding:8px 15px;border-radius:20px;text-decoration:none;box-shadow:0 8px 18px rgba(92,125,76,.3)}
+  .h3d-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:11.5px;color:var(--muted);background:rgba(255,255,255,.78);backdrop-filter:blur(6px);padding:6px 14px;border-radius:20px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity .4s}
+  .h3d-hint.show{opacity:1}
+  .h3d-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;font-size:12.5px;color:var(--muted)}
+  .h3d-ring{width:20px;height:20px;border:2.5px solid #d8cca8;border-top-color:var(--accent);border-radius:50%;animation:h3spin .8s linear infinite}
+  @keyframes h3spin{to{transform:rotate(360deg)}}
+
   .oneline{background:var(--ink);color:#f3ecdd;text-align:center}
   .oneline .wrap{padding:48px 24px}
   .oneline p{font-family:var(--mincho);font-weight:600;font-size:clamp(19px,3.2vw,29px);line-height:1.6}
@@ -119,15 +134,24 @@
   </div>
 </div></div></div>
 
-<header class="hero"><div class="wrap">
-  <div class="badge"><span class="dotjp"></span><b>MADE IN JAPAN</b>／大分・自社工場</div>
-  <h1>木と竹の、<br><span class="ac">あなただけ</span>の一台。</h1>
-  <p class="sub">ki-gu-miの木工クラフトを、3Dで回して確かめて、名入れ・刻印までカスタム。竹集成材で、大分の自社工場が一台ずつお作りします。</p>
-  <div class="btns">
-    <a class="btn btn-main" href="gallery.html">▶ ギャラリーを歩く</a>
-    <a class="btn btn-ghost" href="custom.html">名入れをカスタムする</a>
+<header class="hero"><div class="wrap hero-grid">
+  <div class="hero-copy">
+    <div class="badge"><span class="dotjp"></span><b>MADE IN JAPAN</b>／大分・自社工場</div>
+    <h1>木と竹の、<br><span class="ac">あなただけ</span>の一台。</h1>
+    <p class="sub">ki-gu-miの木工クラフトを、3Dで回して確かめて、名入れ・刻印までカスタム。竹集成材で、大分の自社工場が一台ずつお作りします。</p>
+    <div class="btns">
+      <a class="btn btn-main" href="gallery.html">▶ ギャラリーを歩く</a>
+      <a class="btn btn-ghost" href="custom.html">名入れをカスタムする</a>
+    </div>
+    <div class="note" style="color:#8a7f6b">※スマホ可・アプリ不要。3Dで質感・立体・名入れをその場で確認できます（決済はデモ）。</div>
   </div>
-  <div class="note" style="color:#8a7f6b">※スマホ可・アプリ不要。3Dで質感・立体・名入れをその場で確認できます（決済はデモ）。</div>
+  <div class="hero3d">
+    <div id="hero3d-mount"></div>
+    <div class="h3d-loading" id="h3dLoading"><div class="h3d-ring"></div>読み込み中…</div>
+    <div class="h3d-badge">3D LIVE</div>
+    <a class="h3d-cta" href="custom.html">名入れする →</a>
+    <div class="h3d-hint" id="h3dHint">ドラッグで回転</div>
+  </div>
 </div></header>
 
 <section class="oneline"><div class="wrap">
@@ -201,5 +225,126 @@
   <div>Wooden Art ki-gu-mi ／ Made in Japan・大分 自社工場　｜　Produced by AZONE-MASTAR</div>
 </footer>
 
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const mount=document.getElementById('hero3d-mount');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,1,0.1,100);
+camera.position.set(0,1.35,5.4);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.08;
+mount.appendChild(renderer.domElement);
+function fit(){ const w=mount.clientWidth,h=mount.clientHeight; if(!w||!h) return;
+  camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); }
+new ResizeObserver(fit).observe(mount); fit();
+
+scene.add(new THREE.HemisphereLight(0xfff4e0,0x6b6250,0.9));
+scene.add(new THREE.AmbientLight(0xffffff,0.4));
+const key=new THREE.DirectionalLight(0xfff3df,2.2); key.position.set(1.5,6,9); scene.add(key);
+const flt=new THREE.DirectionalLight(0xffffff,0.5); flt.position.set(-5,3,5); scene.add(flt);
+
+// soft contact shadow (fake AO disc, avoids costly real-time shadow map for a small LP widget)
+const shadowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=256;const x=cv.getContext('2d');
+  const g=x.createRadialGradient(128,128,10,128,128,124); g.addColorStop(0,'rgba(30,22,10,.38)'); g.addColorStop(1,'rgba(30,22,10,0)');
+  x.fillStyle=g; x.fillRect(0,0,256,256); return new THREE.CanvasTexture(cv);})();
+const shadowDisc=new THREE.Mesh(new THREE.PlaneGeometry(3.2,3.2), new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false}));
+shadowDisc.rotation.x=-Math.PI/2; shadowDisc.position.y=0.003; scene.add(shadowDisc);
+
+const holder=new THREE.Group(); scene.add(holder);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08; controls.enablePan=false; controls.enableZoom=false;
+controls.minPolarAngle=Math.PI*0.3; controls.maxPolarAngle=Math.PI*0.54;
+controls.autoRotate=true; controls.autoRotateSpeed=1.3;
+controls.target.set(0,1.15,0);
+
+// 竹の集成材テクスチャ（customizerと同じ生成ロジック）
+function bambooTex(baseHex){
+  const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const x=cv.getContext('2d');
+  x.fillStyle='#'+baseHex.toString(16).padStart(6,'0'); x.fillRect(0,0,256,512);
+  const cols=8, cw=256/cols;
+  for(let c=0;c<cols;c++){
+    x.fillStyle='rgba(60,40,18,0.22)'; x.fillRect(c*cw,0,1.4,512);
+    for(let g=0; g<6; g++){ const gx=c*cw+2+Math.random()*(cw-4); x.strokeStyle=`rgba(70,48,20,${0.05+Math.random()*0.08})`; x.lineWidth=0.6+Math.random()*0.6;
+      x.beginPath(); x.moveTo(gx,0); x.bezierCurveTo(gx+2,170,gx-2,340,gx,512); x.stroke(); }
+    if(Math.random()<0.7){ const ny=60+Math.random()*400; x.strokeStyle='rgba(90,60,26,0.26)'; x.lineWidth=1.5;
+      x.beginPath(); x.moveTo(c*cw+1,ny); x.lineTo(c*cw+cw-1,ny); x.stroke(); }
+  }
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t;
+}
+function triplanarUV(geo,scale){
+  const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
+  const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
+  for(let i=0;i<n;i+=3){ A.fromBufferAttribute(pos,i);B.fromBufferAttribute(pos,i+1);C.fromBufferAttribute(pos,i+2);
+    ab.subVectors(B,A);ac.subVectors(C,A);nr.crossVectors(ab,ac);
+    const ax=Math.abs(nr.x),ay=Math.abs(nr.y),az=Math.abs(nr.z),V=[A,B,C];
+    for(let j=0;j<3;j++){ const v=V[j]; let u,w;
+      if(ay>=ax&&ay>=az){ u=v.x; w=v.z; } else if(ax>=az){ u=v.z; w=v.y; } else { u=v.x; w=v.y; }
+      uv[(i+j)*2]=u*scale; uv[(i+j)*2+1]=w*scale; }
+  }
+  geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+}
+function engTex(text,aspect,fill){
+  const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';
+  let fs=Math.round(H*(fill||0.36)); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
+  while(x.measureText(text).width>W*0.94 && fs>12){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
+  x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
+  x.fillStyle='#9c7846'; x.fillText(text,W/2,H*0.54);
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');
+
+new GLTFLoader().load('models/saisen.glb', gltf=>{
+  const root=gltf.scene;
+  const mat=new THREE.MeshStandardMaterial({map:bambooTex(0xd8b878),color:0xffffff,roughness:0.62,metalness:0.02});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0xad8a56),color:0xffffff,roughness:0.6,metalness:0.03});
+  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
+  const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
+  const engNodes=[];
+  root.traverse(o=>{ if(!o.isMesh) return;
+    if(isEng(o)){ o.visible=false; for(const k in ENGMAP){ if(o.name.includes(k)){ engNodes.push({node:o,cfg:ENGMAP[k]}); break; } } return; }
+    o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=isBrown(o)?brownMat:mat;
+  });
+  root.updateMatrixWorld(true);
+  const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });
+  const size=new THREE.Vector3(),ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
+  const g=new THREE.Group(); g.add(root); root.position.set(-ctr.x,-ctr.y,-ctr.z);
+  const targetH=2.15, sc=targetH/Math.max(size.y,0.001);
+  g.scale.setScalar(sc); g.position.y=size.y*sc/2;
+  holder.add(g); holder.updateMatrixWorld(true);
+  // 前面「賽銭箱」＋額束「開運」を竹面に密着配置（傾きに追従）
+  const rc=new THREE.Raycaster();
+  engNodes.forEach(({node,cfg})=>{
+    node.updateWorldMatrix(true,false);
+    const wp=new THREE.Vector3(),wq=new THREE.Quaternion(),wsc=new THREE.Vector3(); node.matrixWorld.decompose(wp,wq,wsc);
+    const W=Math.max(Math.abs(wsc.x)*2*cfg.ps,0.02),H=Math.max(Math.abs(wsc.y)*2*cfg.ps,0.02);
+    let n=new THREE.Vector3(0,0,1).applyQuaternion(wq); if(n.z<0) n.negate(); n.normalize();
+    const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),n);
+    rc.set(wp.clone().addScaledVector(n,0.35), n.clone().negate());
+    const hit=rc.intersectObject(g,true)[0];
+    const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n,0.003);
+    const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+    pl.quaternion.copy(q); pl.position.copy(pos); pl.renderOrder=3; holder.add(pl);
+  });
+  controls.target.set(0,size.y*sc*0.5,0);
+  document.getElementById('h3dLoading').style.display='none';
+  const hint=document.getElementById('h3dHint'); hint.classList.add('show'); setTimeout(()=>hint.classList.remove('show'),3200);
+}, undefined, err=>{ document.getElementById('h3dLoading').innerHTML='読み込みに失敗しました'; console.error(err); });
+
+const clock=new THREE.Clock();
+(function animate(){ requestAnimationFrame(animate); clock.getDelta(); controls.update(); renderer.render(scene,camera); })();
+</script>
 </body>
 </html>
