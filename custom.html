@@ -53,6 +53,19 @@
   #engFields input:focus{border-color:var(--accent)}
   #engFields input::placeholder{color:#c3bba9;font-family:var(--sans)}
   .hintx{font-size:10.5px;color:var(--muted);margin-top:6px}
+  .saveRow{display:flex;gap:8px;margin-bottom:8px}
+  .sbtn{flex:1;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .sbtn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .sbtn:active{transform:translateY(1px)}
+  #draftList{max-height:154px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+  .dnote{font-size:10.5px;color:var(--muted);line-height:1.55}
+  .draft{display:flex;gap:6px;align-items:stretch}
+  .dLoad{flex:1;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--ink);cursor:pointer;font-family:var(--mincho);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dLoad:hover{border-color:var(--accent)}
+  .dDel{width:30px;flex:none;background:#fff;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer}
+  .dDel:hover{color:#b23524;border-color:#b23524}
+  #toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(10px);background:rgba(40,30,18,.94);color:#fff;padding:10px 18px;border-radius:22px;font-size:13px;font-family:var(--sans);opacity:0;pointer-events:none;transition:.25s;z-index:60}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   /* order bar */
   #bar{position:fixed;left:18px;bottom:18px;z-index:22;display:none;align-items:center;gap:16px;
@@ -123,10 +136,20 @@
     <div class="opts" id="fonts"></div>
   </div>
 
-  <div class="grp" style="margin-bottom:0">
+  <div class="grp">
     <div class="lab"><span class="jp">素材</span> MATERIAL</div>
     <div class="opts" id="finishes"></div>
     <div class="hintx">竹集成材（素地）・大分自社工場／実物大 約150×85×163mm・完成品（500円玉 約40枚収納）</div>
+  </div>
+
+  <div class="grp" style="margin-bottom:0">
+    <div class="lab"><span class="jp">保存・一時保管</span> SAVE <span style="color:var(--accent-d);font-size:11px">この端末＋共有リンク</span></div>
+    <div class="saveRow">
+      <button id="saveBtn" class="sbtn">＋ この作品を保存</button>
+      <button id="linkBtn" class="sbtn ghost">🔗 共有リンク</button>
+    </div>
+    <div id="draftList"></div>
+    <div class="hintx">編集内容はこの端末に自動保存され、次回そのまま続きから始められます。共有リンクなら別の端末でも同じ作品を開けます。</div>
   </div>
 </div>
 
@@ -330,6 +353,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   document.getElementById('hint').style.display='block'; setTimeout(()=>document.getElementById('hint').style.display='none',4500);
   buildEngFields(); refreshEng();                              // 3スロットのUI生成＋標準刻印表示
   renderUI(); refreshBar();
+  restoreOnLoad(); setupSaveUI();                              // 共有リンク＞前回の続きを復元＋保存UI初期化
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
 
@@ -339,8 +363,8 @@ function applyFinish(){ if(boxMat){ boxMat.map=bambooTex(FINISHES[finIdx].base);
 function chip(wrap,arr,cur,fn,label){ wrap.innerHTML=''; arr.forEach((o,i)=>{ const b=document.createElement('div'); b.className='opt'+(i===cur?' sel':'');
   b.innerHTML=label(o); b.onclick=()=>fn(i); wrap.appendChild(b); }); }
 function renderUI(){
-  chip(document.getElementById('fonts'),FONTS,fontIdx,i=>{fontIdx=i;renderUI();refreshEng();},o=>o.n);
-  chip(document.getElementById('finishes'),FINISHES,finIdx,i=>{finIdx=i;renderUI();applyFinish();refreshBar();},o=>`${o.n}<br><small>${yen(o.price)}</small>`);
+  chip(document.getElementById('fonts'),FONTS,fontIdx,i=>{fontIdx=i;renderUI();refreshEng();autosave();},o=>o.n);
+  chip(document.getElementById('finishes'),FINISHES,finIdx,i=>{finIdx=i;renderUI();applyFinish();refreshBar();autosave();},o=>`${o.n}<br><small>${yen(o.price)}</small>`);
 }
 function buildEngFields(){
   const box=document.getElementById('engFields'); if(!box) return; box.innerHTML='';
@@ -349,10 +373,42 @@ function buildEngFields(){
     w.innerHTML=`<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 3px">${e.label}</label>`
       +`<input id="in_${e.id}" maxlength="${e.max}" placeholder="${e.ph}" value="${engVal[e.id]}" style="width:100%">`;
     box.appendChild(w);
-    w.querySelector('input').addEventListener('input',ev=>{ engVal[e.id]=ev.target.value.trim(); refreshEng(); refreshBar(); });
+    w.querySelector('input').addEventListener('input',ev=>{ engVal[e.id]=ev.target.value.trim(); refreshEng(); refreshBar(); autosave(); });
   });
 }
 function refreshBar(){ document.getElementById('barSpec').textContent=specText(); document.getElementById('barPrice').innerHTML=yen(price())+' <small>〜</small>'; }
+
+// ---------- 保存・一時保管（この端末＋共有リンク） ----------
+const LS_LAST='kigumi_saisen_last', LS_DRAFTS='kigumi_saisen_drafts';
+function getState(){ return {m:engVal.main, s1:engVal.seal1, s2:engVal.seal2, f:fontIdx, fi:finIdx}; }
+function applyState(st){ if(!st) return;
+  if('m' in st) engVal.main=st.m||''; if('s1' in st) engVal.seal1=st.s1||''; if('s2' in st) engVal.seal2=st.s2||'';
+  if(typeof st.f==='number') fontIdx=Math.min(Math.max(st.f|0,0),FONTS.length-1);
+  if(typeof st.fi==='number') finIdx=Math.min(Math.max(st.fi|0,0),FINISHES.length-1);
+  ENGRAVINGS.forEach(e=>{ const el=document.getElementById('in_'+e.id); if(el) el.value=engVal[e.id]; });
+  renderUI(); applyFinish(); refreshEng(); refreshBar();
+}
+function autosave(){ try{ localStorage.setItem(LS_LAST, JSON.stringify(getState())); }catch(_){} }
+function loadLast(){ try{ return JSON.parse(localStorage.getItem(LS_LAST)); }catch(_){ return null; } }
+function loadDrafts(){ try{ return JSON.parse(localStorage.getItem(LS_DRAFTS))||[]; }catch(_){ return []; } }
+function storeDrafts(a){ try{ localStorage.setItem(LS_DRAFTS, JSON.stringify(a)); }catch(_){} }
+function draftLabel(st){ return (st.m||'（名入れなし）')+((st.s1||st.s2)?`　額束「${(st.s1||'　')+(st.s2||'　')}」`:''); }
+function saveDraft(){ const a=loadDrafts(); a.unshift({id:'d'+Date.now(), label:draftLabel(getState()), st:getState()}); storeDrafts(a.slice(0,30)); renderDrafts(); toast('作品を保存しました'); }
+function delDraft(id){ storeDrafts(loadDrafts().filter(d=>d.id!==id)); renderDrafts(); }
+function renderDrafts(){ const box=document.getElementById('draftList'); if(!box) return; const a=loadDrafts();
+  if(!a.length){ box.innerHTML='<div class="dnote">保存された作品はまだありません。名入れ後に「＋ この作品を保存」で一時保管できます。</div>'; return; }
+  box.innerHTML=a.map(d=>`<div class="draft"><button class="dLoad" data-id="${d.id}">${d.label}</button><button class="dDel" data-id="${d.id}" title="削除">✕</button></div>`).join('');
+  box.querySelectorAll('.dLoad').forEach(b=>b.onclick=()=>{ const d=loadDrafts().find(x=>x.id===b.dataset.id); if(d){ applyState(d.st); autosave(); toast('作品を呼び出しました'); } });
+  box.querySelectorAll('.dDel').forEach(b=>b.onclick=()=>delDraft(b.dataset.id));
+}
+function stateToLink(){ const s=btoa(unescape(encodeURIComponent(JSON.stringify(getState())))); return location.origin+location.pathname+'#d='+s; }
+function stateFromURL(){ const m=(location.hash||'').match(/d=([^&]+)/); if(!m) return null; try{ return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }catch(_){ return null; } }
+async function copyLink(){ const url=stateToLink(); try{ await navigator.clipboard.writeText(url); toast('共有リンクをコピーしました'); }catch(_){ prompt('この共有リンクをコピーしてください', url); } }
+let toastT=null;
+function toast(msg){ let el=document.getElementById('toast'); if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); } el.textContent=msg; el.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1900); }
+function restoreOnLoad(){ const urlSt=stateFromURL(); const st=urlSt||loadLast(); if(st) applyState(st);
+  if(urlSt){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(_){} } }
+function setupSaveUI(){ document.getElementById('saveBtn').onclick=saveDraft; document.getElementById('linkBtn').onclick=copyLink; renderDrafts(); }
 document.getElementById('spin').addEventListener('click',function(){ spin=!spin; this.classList.toggle('on',spin); });
 
 // ---------- order flow ----------
