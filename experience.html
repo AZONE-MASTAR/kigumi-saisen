@@ -460,18 +460,21 @@ function stepConf(){ mTitle.textContent='ご確認';
 // 注文メール送信（FormSubmit：アカウント不要／届け先はbase64で秘匿・有効化後は匿名エイリアスに差し替え可）
 const ORDER_TO='dG9zaGlvLmtpa3VjaGkuNzc3QGdtYWlsLmNvbQ==';
 function orderNo(){ return 'KGM-'+String(Math.floor(100000+((price()*qty+(engVal.main||'').length*37+(order.email||'').length*11)%900000))); }
+function reproLink(){ const s=btoa(unescape(encodeURIComponent(JSON.stringify(getState())))); return location.origin+location.pathname.replace(/[^/]*$/,'custom.html')+'#d='+s; }
 async function placeOrder(){
   const btn=document.getElementById('place'); btn.disabled=true; btn.textContent='送信中…';
-  const onum=orderNo();
+  const onum=orderNo(); const repro=reproLink(); const st=getState();
   const payload={
     _subject:`【ki-gu-mi 賽銭貯金箱】ご注文 ${order.last}${order.first} 様（${onum}）`,
     _template:'table', _captcha:'false',
     name:`${order.last} ${order.first}`, email:order.email,
-    _autoresponse:`${order.last} ${order.first} 様\n\nこの度は ki-gu-mi 賽銭貯金箱 をご注文いただきありがとうございます。以下の内容で受け付けました。大分の自社工場より一台ずつお作りします。\n\n■ 注文番号：${onum}\n■ 名入れ（前面）：${engVal.main||'なし'}\n■ 刻印①（額束・上）：${engVal.seal1||'なし'}\n■ 刻印②（額束・下）：${engVal.seal2||'なし'}\n■ 書体：${FONTS[fontIdx].n}／素材：${FINISHES[finIdx].n}\n■ 数量：${qty}／合計：${yen(price()*qty)}\n\n※本メールは体験デモです。実際の決済・製造は行われません。`,
+    _autoresponse:`${order.last} ${order.first} 様\n\nこの度は ki-gu-mi 賽銭貯金箱 をご注文いただきありがとうございます。以下の内容で受け付けました。大分の自社工場より一台ずつお作りします。\n\n■ 注文番号：${onum}\n■ 名入れ（前面）：${engVal.main||'なし'}\n■ 刻印①（額束・上）：${engVal.seal1||'なし'}\n■ 刻印②（額束・下）：${engVal.seal2||'なし'}\n■ 書体：${FONTS[fontIdx].n}／素材：${FINISHES[finIdx].n}\n■ 数量：${qty}／合計：${yen(price()*qty)}\n\n▼ 注文どおりの3Dを開く（内容の確認・修正に）\n${repro}\n\n※本メールは体験デモです。実際の決済・製造は行われません。`,
     注文番号:onum, 商品:'ki-gu-mi 賽銭貯金箱', 数量:qty, 合計:yen(price()*qty),
     素材:FINISHES[finIdx].n, 書体:FONTS[fontIdx].n,
     '名入れ（前面）':engVal.main||'（なし）', '刻印①（額束上）':engVal.seal1||'（なし）', '刻印②（額束下）':engVal.seal2||'（なし）',
-    お届け先:`${order.last} ${order.first}`, ご住所:order.addr||'（未入力）'
+    お届け先:`${order.last} ${order.first}`, メール:order.email, ご住所:order.addr||'（未入力）',
+    '設計を再現（クリックで注文どおりに開く）':repro,
+    '設計データ（復元用JSON）':JSON.stringify(st)
   };
   try{
     const res=await fetch('https://formsubmit.co/ajax/'+atob(ORDER_TO),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)});
