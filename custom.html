@@ -414,6 +414,7 @@ document.getElementById('spin').addEventListener('click',function(){ spin=!spin;
 // ---------- order flow ----------
 const modal=document.getElementById('modal'),mBody=document.getElementById('mBody'),mTitle=document.getElementById('mTitle');
 let qty=1;
+let order={last:'',first:'',email:'',addr:''};
 document.getElementById('buy').addEventListener('click',()=>{qty=1;modal.style.display='flex';stepCart();});
 document.getElementById('mX').addEventListener('click',()=>modal.style.display='none');
 modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none';});
@@ -426,33 +427,67 @@ function stepCart(){ mTitle.textContent='ご注文内容';
    <div class="dn">大分の自社工場で竹集成材から一台ずつお作りします。刻印・名入れは無料。実決済は本番でStripe等に接続します。</div>`;
   document.getElementById('toShip').onclick=stepShip;
 }
+const CF=(l,v)=>`<div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;margin:5px 2px"><span>${l}</span><span style="text-align:right;color:var(--ink)">${v}</span></div>`;
 function stepShip(){ mTitle.textContent='お届け先';
   mBody.innerHTML=`<div class="steps"><i class="on"></i><i class="on"></i><i></i></div>
-   <div class="grid2"><div class="fld"><label>姓</label><input placeholder="山田"></div><div class="fld"><label>名</label><input placeholder="太郎"></div></div>
-   <div class="fld"><label>メール</label><input type="email" placeholder="you@example.com"></div>
+   <div class="grid2"><div class="fld"><label>姓</label><input id="o_last" placeholder="山田" value="${order.last}"></div><div class="fld"><label>名</label><input id="o_first" placeholder="太郎" value="${order.first}"></div></div>
+   <div class="fld"><label>メール</label><input id="o_email" type="email" placeholder="you@example.com" value="${order.email}"></div>
    <div class="fld"><label>刻印内容の確認（前面／額束①②）</label><input value="${[engVal.main,engVal.seal1,engVal.seal2].filter(Boolean).join(' ／ ')||'（なし）'}" readonly></div>
-   <div class="fld"><label>ご住所</label><input placeholder="大分県…"></div>
+   <div class="fld"><label>ご住所</label><input id="o_addr" placeholder="大分県…" value="${order.addr}"></div>
    <div class="act"><button class="btn ghost" id="bk">←</button><button class="btn go" id="toConf">確認へ →</button></div>
-   <div class="dn">入力はデモ用です。実際の送信・決済は行われません。</div>`;
-  document.getElementById('bk').onclick=stepCart; document.getElementById('toConf').onclick=stepConf;
+   <div class="dn">ご注文内容はメールでお店に届きます（ご入力のメール宛にも控えが届きます）。決済は本番でStripe等に接続します。</div>`;
+  document.getElementById('bk').onclick=stepCart;
+  document.getElementById('toConf').onclick=()=>{
+    order.last=document.getElementById('o_last').value.trim(); order.first=document.getElementById('o_first').value.trim();
+    order.email=document.getElementById('o_email').value.trim(); order.addr=document.getElementById('o_addr').value.trim();
+    if(!order.last && !order.first){ toast('お名前を入力してください'); return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(order.email)){ toast('メールアドレスを正しく入力してください'); return; }
+    stepConf();
+  };
 }
 function stepConf(){ mTitle.textContent='ご確認';
   mBody.innerHTML=`<div class="steps"><i class="on"></i><i class="on"></i><i class="on"></i></div>
    <div class="row">${mini()}<div class="t"><div class="nm">ki-gu-mi 賽銭貯金箱 ×${qty}</div><div class="sp">${specText()}</div></div><div class="pr">${yen(price()*qty)}</div></div>
-   <div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin:4px 2px"><span>刻印・名入れ</span><span>無料</span></div>
-   <div style="font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin:4px 2px"><span>製造</span><span>大分・自社工場（受注生産）</span></div>
+   ${CF('刻印',`前面「${engVal.main||'—'}」／額束「${(engVal.seal1||'　')+(engVal.seal2||'　')}」`)}
+   ${CF('お届け先',`${order.last}${order.first} 様`)}
+   ${CF('メール',order.email)}
+   ${CF('製造','大分・自社工場（受注生産）')}
    <div class="total"><span class="l">合計（税込）</span><span class="v">${yen(price()*qty)}</span></div>
-   <div class="act"><button class="btn ghost" id="bk">←</button><button class="btn go" id="place">この内容で注文を確定</button></div>
-   <div class="dn">「確定」してもデモのため課金は発生しません。</div>`;
-  document.getElementById('bk').onclick=stepShip; document.getElementById('place').onclick=stepDone;
+   <div class="act"><button class="btn ghost" id="bk">←</button><button class="btn go" id="place">この内容で注文する</button></div>
+   <div class="dn">「注文する」でご注文内容がメール送信されます（決済は本番でStripe等に接続）。</div>`;
+  document.getElementById('bk').onclick=stepShip; document.getElementById('place').onclick=placeOrder;
 }
-function stepDone(){ mTitle.textContent='COMPLETE';
-  const onum='BSB-'+SIZES[sizeIdx].n+'-'+Math.floor(100000+((price()*qty)%900000));
+// 注文メール送信（FormSubmit：アカウント不要／届け先はbase64で秘匿・有効化後は匿名エイリアスに差し替え可）
+const ORDER_TO='dG9zaGlvLmtpa3VjaGkuNzc3QGdtYWlsLmNvbQ==';
+function orderNo(){ return 'KGM-'+String(Math.floor(100000+((price()*qty+(engVal.main||'').length*37+(order.email||'').length*11)%900000))); }
+async function placeOrder(){
+  const btn=document.getElementById('place'); btn.disabled=true; btn.textContent='送信中…';
+  const onum=orderNo();
+  const payload={
+    _subject:`【ki-gu-mi 賽銭貯金箱】ご注文 ${order.last}${order.first} 様（${onum}）`,
+    _template:'table', _captcha:'false',
+    name:`${order.last} ${order.first}`, email:order.email,
+    _autoresponse:`${order.last} ${order.first} 様\n\nこの度は ki-gu-mi 賽銭貯金箱 をご注文いただきありがとうございます。以下の内容で受け付けました。大分の自社工場より一台ずつお作りします。\n\n■ 注文番号：${onum}\n■ 名入れ（前面）：${engVal.main||'なし'}\n■ 刻印①（額束・上）：${engVal.seal1||'なし'}\n■ 刻印②（額束・下）：${engVal.seal2||'なし'}\n■ 書体：${FONTS[fontIdx].n}／素材：${FINISHES[finIdx].n}\n■ 数量：${qty}／合計：${yen(price()*qty)}\n\n※本メールは体験デモです。実際の決済・製造は行われません。`,
+    注文番号:onum, 商品:'ki-gu-mi 賽銭貯金箱', 数量:qty, 合計:yen(price()*qty),
+    素材:FINISHES[finIdx].n, 書体:FONTS[fontIdx].n,
+    '名入れ（前面）':engVal.main||'（なし）', '刻印①（額束上）':engVal.seal1||'（なし）', '刻印②（額束下）':engVal.seal2||'（なし）',
+    お届け先:`${order.last} ${order.first}`, ご住所:order.addr||'（未入力）'
+  };
+  try{
+    const res=await fetch('https://formsubmit.co/ajax/'+atob(ORDER_TO),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('http '+res.status);
+    stepDone(onum);
+  }catch(err){
+    btn.disabled=false; btn.textContent='この内容で注文する';
+    if(!document.getElementById('oerr')) mBody.insertAdjacentHTML('afterbegin','<div id="oerr" style="background:#fbeae7;color:#a3372a;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px">送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。</div>');
+  }
+}
+function stepDone(onum){ mTitle.textContent='COMPLETE';
   mBody.innerHTML=`<div class="done"><div class="chk">✓</div><h3>ご注文ありがとうございます</h3>
-   <p>ki-gu-mi 賽銭貯金箱（${specText()}）を受け付けました。<br>大分の自社工場より、一台ずつお作りします。</p>
+   <p>ki-gu-mi 賽銭貯金箱（${specText()}）を受け付けました。<br>ご入力のメール宛にも確認をお送りしました。<br>大分の自社工場より、一台ずつお作りします。</p>
    <div class="onum">注文番号　${onum}</div>
    <div class="act" style="margin-top:18px"><button class="btn go" id="cls">閉じる</button></div>
-   <div class="dn">※体験デモ。実際の決済・製造は行われません。</div></div>`;
+   <div class="dn">※受注メールを送信しました。決済・製造は本番接続時に有効化されます。</div></div>`;
   document.getElementById('cls').onclick=()=>modal.style.display='none';
 }
 
