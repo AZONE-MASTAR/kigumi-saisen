@@ -273,14 +273,13 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
   const root=gltf.scene;
   const boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xd8b878, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
-  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name.includes('マテリアル'));
+  const isBrown=o=>o.name.includes('茶色');   // 焼き色（注連縄・金具）は「茶色」ノードのみ。マテリアル名一致だと本体016(マテリアル.001)まで濃くなるため名前判定に限定
   // 爆発の基準点：常に組み立て済みの位置に固定し、他パーツはここより上へ分解する。
   // GLTFLoaderはノード名の「.」を除去してThree.jsオブジェクト名にする（アニメーションパスの区切り文字と衝突するため）ので、
   // GLB内の実際の名前は「本体.040」だが、ロード後のシーングラフ上では「本体040」になる点に注意
   const ANCHOR_NAME='本体040';
   const bodyMeshes=[];
   let anchorMesh=null;
-  let topPlateMesh=null;   // 本体010＝鳥居最上部の笠木。完成形で下の島木との間に隙間が空いて浮くため後で補正する
   root.traverse(o=>{
     if(!o.isMesh) return;
     const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
@@ -295,17 +294,7 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
     if(brown){ brownMeshes.push(o); return; }
     bodyMeshes.push(o);
     if(o.name===ANCHOR_NAME) anchorMesh=o;
-    if(o.name==='本体010') topPlateMesh=o;
   });
-  // 本体010（笠木・最上部の天板）の浮き補正：
-  // 完成形のジオメトリでは本体010の最下点Y≈105.80、その直下でXZが重なる最上パーツ(島木＝本体004)の
-  // 上端Y≈100.12で、約5.68(rawジオメトリ単位)の隙間が空いて浮いて見える。
-  // mesh.position はroot直下のローカル(=rawジオメトリと同一単位)座標なので、Yを-5.68下げて島木の上に接地させる。
-  // ※本体010単体にのみ適用。継ぎ目輪郭(seam edges)は子要素なので親の移動に自動追従する。
-  //   この補正後にaddSeamEdges/中心合わせbbox/爆発計算(homePosはmesh.positionのclone)が走るため、全工程に反映される。
-  const TOP_PLATE_Y_FIX=-5.68;
-  if(topPlateMesh){ topPlateMesh.position.y+=TOP_PLATE_Y_FIX; }
-  else console.warn('assembly: 本体010 (top plate) not found — skip float correction');
   bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（traverse中に子を足すと無限再帰する地雷を回避）
   brownMeshes.forEach(addSeamEdges);  // 茶色にも継ぎ目輪郭（完成時に他パーツと見た目を揃える）
   root.updateMatrixWorld(true);

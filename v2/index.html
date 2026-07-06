@@ -314,18 +314,15 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
   const root=gltf.scene;
   const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xd8b878,roughness:0.62,metalness:0.02});
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03});
-  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name.includes('マテリアル'));
+  const isBrown=o=>o.name.includes('茶色');   // 焼き色（注連縄・金具）は「茶色」ノードのみ。マテリアル名一致だと本体016(マテリアル.001)まで濃くなるため名前判定に限定
   const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
-  const engNodes=[]; const bodyMeshes=[]; let topPlateMesh=null;   // 本体010＝笠木（浮き補正対象）
+  const engNodes=[]; const bodyMeshes=[];
   root.traverse(o=>{ if(!o.isMesh) return;
     if(isEng(o)){ o.visible=false; for(const k in ENGMAP){ if(o.name.includes(k)){ engNodes.push({node:o,cfg:ENGMAP[k]}); break; } } return; }
     if(o.name==='文字'){ o.visible=false; return; }   // 旧デザインのベイク済み文字メッシュは非表示
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=isBrown(o)?brownMat:mat;
     bodyMeshes.push(o);
-    if(o.name==='本体010') topPlateMesh=o;
   });
-  // 本体010（笠木）の浮き補正：下の島木との隙間(約5.68 rawジオメトリ単位)を詰めて接地させる。継ぎ目輪郭は子要素なので追従
-  if(topPlateMesh) topPlateMesh.position.y+=-5.68;
   bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（子を追加すると再帰してしまうため）
   root.updateMatrixWorld(true);
   const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });
