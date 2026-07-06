@@ -205,6 +205,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 // ---------- options ----------
 const FONTS=[{n:'明朝',css:'"Shippori Mincho B1", serif'},{n:'古印',css:'"Zen Old Mincho", serif'},{n:'ゴシック',css:'"Zen Kaku Gothic New", sans-serif'}];
@@ -268,11 +271,13 @@ const bambooPhoto=bambooMap('../textures/bamboo.jpg'); bambooPhoto.colorSpace=TH
 const bambooNormal=bambooMap('../textures/bamboo_normal.png');                                        // 法線（データ・リニア）
 const bambooRough=bambooMap('../textures/bamboo_rough.jpg');                                          // ラフネス（データ・リニア）
 const bambooBump=bambooMap('../textures/bamboo_bump.jpg');                                            // バンプ（データ・リニア）
-// パーツの継ぎ目にうっすら茶色い輪郭を出すためのライン素材
-const seamLineMat=new THREE.LineBasicMaterial({color:0x5a3d22, transparent:true, opacity:0.35});
+// パーツの継ぎ目に茶色い輪郭を出すためのライン素材（Line2＝画面ピクセル基準の実太さ。LineBasicMaterialのlinewidthは大半のブラウザで無視されるため）
+const seamLineMat=new LineMaterial({color:0x5a3d22, transparent:true, opacity:0.55, linewidth:2.4});
+seamLineMat.resolution.set(innerWidth, innerHeight);
 function addSeamEdges(mesh){
   const eg=new THREE.EdgesGeometry(mesh.geometry, 20);
-  const seg=new THREE.LineSegments(eg, seamLineMat); seg.renderOrder=2;
+  const lsg=new LineSegmentsGeometry().setPositions(eg.attributes.position.array);
+  const seg=new LineSegments2(lsg, seamLineMat); seg.renderOrder=2; seg.computeLineDistances();
   mesh.add(seg);
 }
 // triplanar UVs so vertical grain runs up on all vertical faces (STL has no UVs)
@@ -368,7 +373,7 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)・旧ベイク済みテキスト(文字)は退避してノード名で対応付け
-  const engNodes={};
+  const engNodes={}; const bodyMeshes=[];
   root.traverse(o=>{
     if(!o.isMesh) return;
     const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
@@ -377,8 +382,9 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
     const brown=isBrown(o);
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
     o.material=brown?brownMat:boxMat; o.castShadow=true; o.receiveShadow=true;
-    addSeamEdges(o);                                          // パーツとパーツの継ぎ目にうっすら輪郭
+    bodyMeshes.push(o);
   });
+  bodyMeshes.forEach(addSeamEdges);   // 継ぎ目の輪郭はtraverse完了後に追加（traverse中に子を足すとLineSegments2もisMesh扱いで再帰してしまうため）
   root.updateMatrixWorld(true);
   // 中心合わせ＆スケール（刻印板を除いた本体のみのbbox）
   const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });
@@ -388,7 +394,7 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
   boxGroup.scale.setScalar(sc); boxGroup.position.y=BASE_TOP+(size.y*sc)/2;
   holder.add(boxGroup); holder.updateMatrixWorld(true);
   // 各刻印スロット：GLBで定義された位置・サイズに合わせ、前面(+Z)向きのテキスト面を配置
-  const rc=new THREE.Raycaster();
+  const rc=new THREE.Raycaster(); rc.camera=camera;   // LineSegments2(継ぎ目輪郭)のレイキャストにcamera参照が必要
   ENGRAVINGS.forEach(e=>{
     const node=engNodes[e.id]; if(!node) return;
     node.updateWorldMatrix(true,false);
@@ -578,7 +584,7 @@ function animate(){ requestAnimationFrame(animate);
   controls.update(); renderer.render(scene,camera);
 }
 animate();
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);seamLineMat.resolution.set(innerWidth,innerHeight);});
 </script>
 </body>
 </html>

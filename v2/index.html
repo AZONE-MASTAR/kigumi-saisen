@@ -235,8 +235,18 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 const mount=document.getElementById('hero3d-mount');
+const seamLineMat=new LineMaterial({color:0x5a3d22, transparent:true, opacity:0.55, linewidth:2.4});
+function addSeamEdges(mesh){
+  const eg=new THREE.EdgesGeometry(mesh.geometry,20);
+  const lsg=new LineSegmentsGeometry().setPositions(eg.attributes.position.array);
+  const seg=new LineSegments2(lsg, seamLineMat); seg.renderOrder=2; seg.computeLineDistances();
+  mesh.add(seg);
+}
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(38,1,0.1,100);
 camera.position.set(0,1.35,5.4);
@@ -246,7 +256,7 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.08;
 mount.appendChild(renderer.domElement);
 function fit(){ const w=mount.clientWidth,h=mount.clientHeight; if(!w||!h) return;
-  camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); }
+  camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); seamLineMat.resolution.set(w,h); }
 new ResizeObserver(fit).observe(mount); fit();
 
 scene.add(new THREE.HemisphereLight(0xfff4e0,0x6b6250,0.9));
@@ -275,8 +285,6 @@ const bambooPhoto=bambooMap('../textures/bamboo.jpg'); bambooPhoto.colorSpace=TH
 const bambooNormal=bambooMap('../textures/bamboo_normal.png');
 const bambooRough=bambooMap('../textures/bamboo_rough.jpg');
 const bambooBump=bambooMap('../textures/bamboo_bump.jpg');
-const seamLineMat=new THREE.LineBasicMaterial({color:0x5a3d22, transparent:true, opacity:0.35});
-function addSeamEdges(mesh){ const eg=new THREE.EdgesGeometry(mesh.geometry,20); const seg=new THREE.LineSegments(eg,seamLineMat); seg.renderOrder=2; mesh.add(seg); }
 function triplanarUV(geo,scale){
   const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
   const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
@@ -307,13 +315,14 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
-  const engNodes=[];
+  const engNodes=[]; const bodyMeshes=[];
   root.traverse(o=>{ if(!o.isMesh) return;
     if(isEng(o)){ o.visible=false; for(const k in ENGMAP){ if(o.name.includes(k)){ engNodes.push({node:o,cfg:ENGMAP[k]}); break; } } return; }
     if(o.name==='文字'){ o.visible=false; return; }   // 旧デザインのベイク済み文字メッシュは非表示
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry,1/42); o.material=isBrown(o)?brownMat:mat;
-    addSeamEdges(o);
+    bodyMeshes.push(o);
   });
+  bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（子を追加すると再帰してしまうため）
   root.updateMatrixWorld(true);
   const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });
   const size=new THREE.Vector3(),ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
@@ -322,7 +331,7 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
   g.scale.setScalar(sc); g.position.y=size.y*sc/2;
   holder.add(g); holder.updateMatrixWorld(true);
   // 前面「賽銭箱」＋額束「開運」を竹面に密着配置（傾きに追従）
-  const rc=new THREE.Raycaster();
+  const rc=new THREE.Raycaster(); rc.camera=camera;   // LineSegments2(継ぎ目輪郭)のレイキャストにcamera参照が必要
   engNodes.forEach(({node,cfg})=>{
     node.updateWorldMatrix(true,false);
     const wp=new THREE.Vector3(),wq=new THREE.Quaternion(),wsc=new THREE.Vector3(); node.matrixWorld.decompose(wp,wq,wsc);
