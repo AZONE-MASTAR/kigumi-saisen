@@ -172,7 +172,7 @@ function cropX(geo,split,keepGreater){
 function engTex(text,aspect,fill){
   const W=1024,H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  x.fillStyle='#fff'; x.fillRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';   // 乗算合成の下地は白
+  x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';   // 背景は透明のまま（乗算はアルファ考慮のCustomBlendingで実現）
   let fs=Math.round(H*(fill||0.36)); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
   while(x.measureText(text).width>W*0.94 && fs>12){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
   const cx=W/2, cy=H*0.54;
@@ -214,7 +214,7 @@ PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
       rc.set(wp.clone().addScaledVector(n,0.35), n.clone().negate());
       const hit=rc.intersectObject(g,true)[0];
       const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n,0.003);
-      const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,blending:THREE.MultiplyBlending,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,alphaTest:0.5,blending:THREE.CustomBlending,blendEquation:THREE.AddEquation,blendSrc:THREE.DstColorFactor,blendDst:THREE.OneMinusSrcAlphaFactor,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
       pl.quaternion.copy(q); pl.position.copy(pos); pl.renderOrder=3; scene.add(pl);
     });
     const lab=labelSprite(p.name,p.price); lab.position.set(p.pos[0],PED_TOP+size.y*sc+0.5,p.pos[1]); scene.add(lab);

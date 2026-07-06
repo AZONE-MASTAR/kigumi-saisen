@@ -300,7 +300,7 @@ function makeEngTex(text, aspect, fill, weight){
   fill=fill||0.72; weight=weight||700;
   const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  x.fillStyle='#fff'; x.fillRect(0,0,W,H);            // 乗算合成の下地は白（＝竹目に影響しない）。文字部分だけ焼き色で暗くする
+  x.clearRect(0,0,W,H);                                // 背景は透明のまま（乗算はアルファ考慮のCustomBlendingで実現）
   if(text){ x.textAlign='center'; x.textBaseline='middle';
     const {lines,fs,lh,cx,cy0}=engLayout(x,text,W,H,fill,weight);
     // 薄い焼き色でやわらかく（重い黒縁は無し）
@@ -395,7 +395,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
     rc.set(wp.clone().addScaledVector(n, 0.35), n.clone().negate());
     const hit=rc.intersectObject(boxGroup, true)[0];
     const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n, 0.003);
-    const mat=new THREE.MeshStandardMaterial({transparent:true, blending:THREE.MultiplyBlending, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const mat=new THREE.MeshStandardMaterial({transparent:true, alphaTest:0.5, blending:THREE.CustomBlending, blendEquation:THREE.AddEquation, blendSrc:THREE.DstColorFactor, blendDst:THREE.OneMinusSrcAlphaFactor, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
     const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
     plane.quaternion.copy(q);
     plane.position.copy(pos);
