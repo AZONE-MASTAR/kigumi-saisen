@@ -49,6 +49,11 @@
   #lookpad{position:absolute;right:0;top:0;width:45%;height:100%;pointer-events:auto;touch-action:none}
   #joy{position:fixed;width:120px;height:120px;margin-left:-60px;margin-top:-60px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);pointer-events:none;display:none}
   #knob{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.5)}
+
+  @media(max-width:700px){
+    #brand{font-size:12.5px}
+    #top{display:none!important}
+  }
 </style>
 </head>
 <body>
@@ -167,7 +172,7 @@ function cropX(geo,split,keepGreater){
 }
 
 // 展示用の刻印テクスチャ（茶色文字・透明背景）
-function engTex(text,aspect){
+function engTex(text,aspect,fill){
   const W=1024,H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
   x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';
