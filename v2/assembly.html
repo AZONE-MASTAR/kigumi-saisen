@@ -369,22 +369,28 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
     const partSize=new THREE.Vector3(); tmpBB.getSize(partSize);
     const partBottomY=tmpBB.min.y;                       // 組み立て時のこのパーツの最下点（ワールドY）
     const partRadius=partSize.length()*0.5;              // パーツ自身の概算半径（大きいパーツほど遠くへ）
-    const i=idx++;
 
-    // 方向：フィボナッチ螺旋（黄金角）でインデックスごとに水平角を均等配置し、
-    // Y成分は常に正（上半球側）に制限＝「上方向優先」。近接パーツの爆発先が重なりにくくなる
-    const az=i*GOLDEN_ANGLE;                             // 方位角（0〜2π・インデックスで均等に回る）
-    const upT=(i+0.5)/Math.max(N-1,1);                    // 0〜1：上に行くほど大きいインデックス側に割り当て
-    const yBias=0.35+upT*0.65;                            // Y成分の比率(0.35〜1.0・常に正＝上向き優先)
-    const horizR=Math.sqrt(Math.max(0,1-yBias*yBias));    // 単位ベクトルになるよう水平成分を正規化
-    const dir=new THREE.Vector3(Math.cos(az)*horizR, yBias, Math.sin(az)*horizR).normalize();
+    // ---- 左右対称な爆発方向 ----
+    // 各パーツを「モデル中心の縦軸から自分の水平位置への方向」へ押し出す。
+    // 商品は左右対称なので、+X のパーツは右へ・その鏡像(-X)は左へと自然に対称に散る。
+    // 方向も距離も対称量（位置・高さ・大きさ）だけで決め、hash等の非対称な乱数は使わない。
+    const hx=partCenterWorld.x-modelCenter.x;
+    const hz=partCenterWorld.z-modelCenter.z;
+    const horiz=new THREE.Vector3(hx,0,hz);
+    const hlen=horiz.length();
+    if(hlen>1e-3) horiz.multiplyScalar(1/hlen); else horiz.set(0,0,1);   // 中心軸上のパーツは前方(+Z)へ（対称を崩さない）
+    // 高いパーツほど上向き成分を強める（Y依存＝左右対称）
+    const heightT=clamp01((partCenterWorld.y-anchorBottomY)/Math.max(1e-3,modelHeight));   // 0(下)〜1(上)
+    const yBias=0.42+heightT*0.48;                       // Y成分の比率(0.42〜0.90・常に正＝上向き優先)
+    const horizW=Math.sqrt(Math.max(0,1-yBias*yBias));    // 単位ベクトルになるよう水平成分を正規化
+    const dir=new THREE.Vector3(horiz.x*horizW, yBias, horiz.z*horizW).normalize();
+    const az=Math.atan2(horiz.z,horiz.x);                 // 組み立て順の水平分散ソート用（方向から算出）
 
-    // 爆発距離：アンカーからのY方向の高さ差（このパーツが元々アンカーよりどれだけ上にあるか）を
-    // 基準距離に反映＋パーツ自身の大きさでスケール（大きい・高いパーツほど離す→重なり低減）
+    // ---- 爆発距離（対称量のみ・以前より寄せる）----
+    // アンカーからの高さ差＋パーツの大きさでスケール（大きい・高いパーツほど離して重なり低減）。
+    // 係数は従来比おおよそ半分に絞り、全体をコンパクトに寄せた。
     const aboveAnchor=Math.max(0, partCenterWorld.y-anchorCenterY);   // アンカーより上にある高さ（下にあれば0扱い）
-    const distT=hash(i*7.13+4*3.71);
-    const baseDist=modelHeight*(0.5+(distT*distT)*0.9) + aboveAnchor*(1.4+distT*1.1);   // 高い位置のパーツほど大きく上へ散らす
-    const dist=baseDist+partRadius*1.6;
+    const dist=modelHeight*0.26 + aboveAnchor*0.7 + partRadius*0.95;
     const explodedOffsetWorld=dir.multiplyScalar(dist);
 
     // アンカー最下点(=新しい床)より下に絶対に行かないようクランプ。
