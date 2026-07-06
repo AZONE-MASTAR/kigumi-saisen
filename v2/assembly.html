@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ki-gu-mi 賽銭貯金箱 — 組み上がる体験</title>
-<meta name="description" content="48の木組みパーツが、スクロールとともに一台の賽銭貯金箱へ組み上がっていく体験。ki-gu-mi・大分自社工場の手仕事を3Dで。">
+<meta name="description" content="バラバラの木組みパーツが、ボタンひとつで一台の賽銭貯金箱へ組み上がっていく体験。ki-gu-mi・大分自社工場の手仕事を3Dで。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@600;700;900&display=swap" rel="stylesheet">
@@ -15,14 +15,11 @@
     --mincho:"Shippori Mincho B1",serif; --old:"Zen Old Mincho",serif; --sans:"Zen Kaku Gothic New",sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
-  body{overflow-x:hidden}
-  /* canvasはドラッグ回転を受けるためpointer-events有効。touch-action:pan-yで
-     縦スワイプはブラウザのネイティブスクロール（＝組み立て操作）に任せ、横ドラッグだけ回転に使う */
-  #app{position:fixed;inset:0;z-index:1;user-select:none;-webkit-user-select:none}
-  #app canvas{display:block;touch-action:pan-y;cursor:grab}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+  /* 全画面固定ビューア。カメラ操作はOrbitControls（ドラッグ回転・ホイール/ピンチズーム）に全面委任 */
+  #app{position:fixed;inset:0;z-index:1}
+  #app canvas{display:block;cursor:grab}
   #app canvas:active{cursor:grabbing}
-  #spacer{position:relative;height:520vh;z-index:2;pointer-events:none}  /* canvasへポインタを通す（スクロールはdocumentが処理するので影響なし） */
 
   #hdr{position:fixed;top:14px;left:16px;right:16px;z-index:35;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 12px;pointer-events:none}
   #hdr>*{pointer-events:auto}
@@ -41,14 +38,20 @@
   /* progress rail */
   #rail{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--gold));z-index:36;width:0%;transition:width .05s linear}
 
-  /* scroll hint */
-  #scrollhint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:11px;letter-spacing:.08em;opacity:0;transition:opacity .5s;pointer-events:none}
-  #scrollhint.show{opacity:1}
-  #scrollhint .chev{width:18px;height:18px;border-right:2px solid var(--accent-d);border-bottom:2px solid var(--accent-d);transform:rotate(45deg);animation:bob 1.6s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:rotate(45deg) translate(0,0)}50%{transform:rotate(45deg) translate(4px,4px)}}
+  /* play button（画面下中央） */
+  #playWrap{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:26;display:flex;flex-direction:column;align-items:center;gap:9px;opacity:0;transition:opacity .5s;pointer-events:none}
+  #playWrap.show{opacity:1}
+  #playWrap.show #playBtn{pointer-events:auto}
+  #playBtn{display:inline-flex;align-items:center;gap:10px;font-family:var(--sans);font-weight:700;font-size:16px;letter-spacing:.04em;color:#fff;
+    background:var(--accent);border:none;border-radius:36px;padding:16px 34px;min-height:52px;cursor:pointer;
+    box-shadow:0 14px 34px rgba(92,125,76,.4);transition:transform .15s,box-shadow .15s,background .2s}
+  #playBtn:hover:not(:disabled){transform:translateY(-2px)}
+  #playBtn:active:not(:disabled){transform:translateY(0)}
+  #playBtn:disabled{background:#9aa78f;cursor:default;box-shadow:0 8px 20px rgba(92,125,76,.2)}
+  #ctrlhint{font-size:11px;letter-spacing:.06em;color:var(--muted);background:rgba(255,253,248,.7);border:1px solid var(--line);border-radius:20px;padding:5px 13px;white-space:nowrap}
 
   /* caption */
-  #caption{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:24;width:min(560px,92vw);text-align:center;pointer-events:none}
+  #caption{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);z-index:24;width:min(560px,92vw);text-align:center;pointer-events:none}
   #caption .line{position:absolute;left:0;right:0;top:0;opacity:0;transition:opacity .6s ease;font-family:var(--mincho);font-weight:700;font-size:clamp(17px,3vw,25px);color:var(--ink);letter-spacing:.03em;text-shadow:0 2px 18px rgba(255,253,248,.9),0 0 4px rgba(255,253,248,.7)}
   #caption .line.on{opacity:1;position:relative}
   #caption .line:not(.on){position:absolute}
@@ -64,10 +67,11 @@
     #brand{font-size:14.5px}
     #brand .en{font-size:9px;letter-spacing:.1em}
     #madein{font-size:9.5px;padding:5px 10px;gap:5px}
-    #caption{bottom:54px;width:94vw}
+    #caption{bottom:108px;width:94vw}
     #caption .line{font-size:clamp(14.5px,4vw,19px)}
     .ctabtn{font-size:12.5px;padding:11px 17px}
-    #scrollhint{bottom:18px}
+    #playWrap{bottom:16px}
+    #playBtn{font-size:15px;padding:15px 30px;min-height:50px}   /* タップしやすいサイズを維持 */
   }
 </style>
 </head>
@@ -82,21 +86,21 @@
 
 <div id="loader"><div class="ring"></div><div class="t" id="lt">竹を削り出しています…</div></div>
 
-<div id="scrollhint"><span>SCROLL して組み立てる</span><div class="chev"></div></div>
-
 <div id="caption">
   <div style="position:relative;height:1.6em">
-    <div class="line" data-i="0">48のパーツ、ひとつの箱へ。</div>
+    <div class="line" data-i="0">バラバラのパーツが、ひとつの箱へ。</div>
     <div class="line" data-i="1">組む、たのしみ。</div>
     <div class="line" data-i="2">あなただけの一台に。</div>
   </div>
   <div id="ctaWrap">
     <a class="ctabtn main" href="custom.html">この一台に、名前を入れる →</a>
-    <button class="ctabtn ghost" id="restartBtn" type="button">もう一度組み立てる</button>
   </div>
 </div>
 
-<div id="spacer"></div>
+<div id="playWrap">
+  <button id="playBtn" type="button">▶ 組み立てる</button>
+  <div id="ctrlhint">ドラッグで回転　·　ホイール / ピンチで拡大</div>
+</div>
 
 <script type="importmap">
 { "imports": {
@@ -107,6 +111,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
@@ -149,6 +154,14 @@ const ground=new THREE.Mesh(new THREE.CircleGeometry(40,48),new THREE.ShadowMate
 ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
 
 const holder=new THREE.Group(); scene.add(holder);
+
+// ---------- OrbitControls（カメラは常にユーザー操作に委任・スクリプトによる移動なし） ----------
+// 1本指ドラッグ=回転 / ピンチ・ホイール=ズーム / パンは無効
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.enablePan=false;
+controls.maxPolarAngle=Math.PI*0.55;
+// minDistance/maxDistance と初期位置は、モデル読み込み後に爆発図の広がりから設定する
 
 // ---------- bamboo texture ----------
 const texLoader=new THREE.TextureLoader();
@@ -249,7 +262,7 @@ function hashRange(i,salt,min,max){ return min+(hash(i*7.13+salt*3.71)*(max-min)
 
 // ---------- assembly state ----------
 let modelReady=false;
-let parts=[];         // {mesh,homePos,homeQuat,startPos,startQuat,startTime,duration}
+let parts=[];         // {mesh,homePos,startPos,centerY,start,duration}（向きは変えず位置だけ動かす）
 let brownMeshes=[];   // 「茶色」＝レーザー刻印の焼き色表現。爆発対象外・完成間際(p>=0.95)にのみ表示
 let modelCenter=new THREE.Vector3();
 let modelHeight=1;
@@ -258,7 +271,7 @@ let engNodes={}; let engPlanesReady=false;
 const easeOutCubic=t=>1-Math.pow(1-t,3);
 const clamp01=t=>Math.max(0,Math.min(1,t));
 
-new GLTFLoader().load('models/saisenglb.glb', gltf=>{
+new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
   const root=gltf.scene;
   const boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xd8b878, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
@@ -335,20 +348,18 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
       if(dir.lengthSq()<1e-6) dir.set(0,1,0);
     }
     dir.normalize();
-    const dist=modelHeight*hashRange(idx,4,0.75,1.05);         // ワールド単位での爆発距離
+    // 爆発距離：広めのレンジ＋二乗歪みで距離のばらつきを強調（均一な球殻状にならないように）
+    const distT=hash(idx*7.13+4*3.71);
+    const dist=modelHeight*(1.4+(distT*distT)*(2.2-1.4)*1.35);   // 約1.4〜2.5×modelHeight・近距離寄りに偏らせつつ遠くまで散らす
     const explodedOffsetWorld=dir.multiplyScalar(dist);
+    // 放射方向に加えて上下方向のスキャッターを追加（浮くパーツ・沈むパーツが混ざる立体的な散らばり）
+    explodedOffsetWorld.y+=modelHeight*hashRange(idx,9,-0.65,0.95);
     const explodedOffsetLocal=explodedOffsetWorld.clone().divideScalar(sc);   // ローカル座標に変換（boxGroupのスケールを打ち消す）
-    // 初期回転：軸・角度はインデックスから決定論的に生成（最大25°程度）
-    const axis=new THREE.Vector3(hashRange(idx,5,-1,1),hashRange(idx,6,-1,1),hashRange(idx,7,-1,1));
-    if(axis.lengthSq()<1e-6) axis.set(0,1,0); axis.normalize();
-    const angle=THREE.MathUtils.degToRad(hashRange(idx,8,-25,25));
-    const startQuat=new THREE.Quaternion().setFromAxisAngle(axis,angle);
+    // 回転は与えない：パーツは組み立て時と同じ向きのまま、位置だけ離す
     return {
       mesh,
       homePos: mesh.position.clone(),          // 元の(=組み上がった)位置：ローカルではほぼ(0,0,0)
-      homeQuat: mesh.quaternion.clone(),
       startPos: mesh.position.clone().add(explodedOffsetLocal),
-      startQuat,
       centerY: partCenterWorld.y
     };
   });
@@ -363,8 +374,20 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
   // 初期状態を爆発図に反映
   applyProgress(0);
 
+  // カメラ初期位置：爆発図全体が収まる引き（以降のカメラ移動はOrbitControlsのユーザー操作のみ）
+  // 縦長（スマホ）は水平FOVが狭いぶん追加で引く
+  const aspectComp=camera.aspect<1?Math.min(1/camera.aspect,1.8):1;
+  const initDist=modelHeight*10.5*aspectComp;
+  const az0=THREE.MathUtils.degToRad(-25);
+  camera.position.set(Math.sin(az0)*initDist, modelHeight*0.55, Math.cos(az0)*initDist);
+  controls.target.set(0, modelHeight*0.42, 0);
+  controls.minDistance=modelHeight*1.3;      // ディテール確認まで寄れる
+  controls.maxDistance=initDist*1.25;        // 爆発図全体＋余白まで引ける
+  controls.update();
+
   document.getElementById('loader').style.display='none';
-  document.getElementById('scrollhint').classList.add('show');
+  document.getElementById('playWrap').classList.add('show');
+  updatePlayBtn();
   modelReady=true;
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
@@ -374,8 +397,7 @@ function applyProgress(p){
   parts.forEach(part=>{
     const t=clamp01((p-part.start)/part.duration);
     const e=easeOutCubic(t);
-    part.mesh.position.lerpVectors(part.startPos, part.homePos, e);
-    part.mesh.quaternion.slerpQuaternions(part.startQuat, part.homeQuat, e);
+    part.mesh.position.lerpVectors(part.startPos, part.homePos, e);   // 向きは常に組み立て時のまま（回転は与えない）
   });
   // 完成演出：p>=0.95で刻印プレーンと「茶色」(焼き色表現)を表示
   // 茶色は爆発対象外（常に最終位置）。爆発中に焼き色だけ宙に浮くと不自然なので隠し、
@@ -383,21 +405,6 @@ function applyProgress(p){
   const done=p>=0.95;
   ENGRAVINGS.forEach(e=>{ if(e.plane) e.plane.visible=done; });
   brownMeshes.forEach(m=>{ m.visible=done; });
-}
-
-function applyCamera(p){
-  // 縦長（スマホ）では水平FOVが狭くなるぶん、爆発時の横方向の広がりが画面外に出やすいので
-  // アスペクト比が1未満のときは引きを追加補正する
-  const aspectComp = camera.aspect<1 ? Math.min(1/camera.aspect, 1.8) : 1;
-  const dist=THREE.MathUtils.lerp(modelHeight*8.6*aspectComp, modelHeight*2.7*Math.max(aspectComp*0.85,1), p);
-  const azimuthDeg=THREE.MathUtils.lerp(-25,10,p);
-  const azimuth=THREE.MathUtils.degToRad(azimuthDeg);
-  const camY=modelHeight*0.5;
-  const camX=Math.sin(azimuth)*dist;
-  const camZ=Math.cos(azimuth)*dist;
-  camera.position.set(camX, camY, camZ);
-  const lookY=modelHeight*THREE.MathUtils.lerp(0.38,0.5,p);
-  camera.lookAt(0, lookY, 0);
 }
 
 // ---------- caption ----------
@@ -414,53 +421,41 @@ function applyCaption(p){
   ctaWrap.classList.toggle('show', p>=0.95);
 }
 
-// ---------- scroll-driven progress ----------
+// ---------- button-driven progress（スクロール駆動は廃止） ----------
 let progress=0;
-function computeProgress(){
-  const doc=document.documentElement;
-  const maxScroll=Math.max(1, doc.scrollHeight-innerHeight);
-  return clamp01(scrollY/maxScroll);
+const PLAY_DUR=7000;   // 進捗0→1のフル再生時間(ms)。分解(逆再生)も同じ速度
+const easeInOutCubic=t=>t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+let playing=false, playFrom=0, playTarget=0, playT0=0, playDurEff=PLAY_DUR;
+const playBtn=document.getElementById('playBtn');
+function updatePlayBtn(){
+  if(playing){ playBtn.disabled=true; playBtn.textContent=playTarget>playFrom?'組み立て中…':'分解中…'; }
+  else{ playBtn.disabled=false; playBtn.textContent=progress>=0.999?'⟲ 分解する':'▶ 組み立てる'; }
 }
-function onScroll(){
-  progress=computeProgress();
+function startPlay(target){
+  if(playing) return;
+  playing=true; playFrom=progress; playTarget=target; playT0=performance.now();
+  playDurEff=Math.max(1, PLAY_DUR*Math.abs(target-playFrom));   // 途中からでも進行速度が一定になるよう距離比で短縮
+  updatePlayBtn();
+}
+playBtn.addEventListener('click', ()=>{ startPlay(progress>=0.999?0:1); });
+function tickPlay(now){
+  if(!playing) return;
+  const t=clamp01((now-playT0)/playDurEff);
+  progress=playFrom+(playTarget-playFrom)*easeInOutCubic(t);
+  if(t>=1){ progress=playTarget; playing=false; updatePlayBtn(); }
   document.getElementById('rail').style.width=(progress*100)+'%';
-  if(progress>0.02) document.getElementById('scrollhint').classList.remove('show');
 }
-addEventListener('scroll', onScroll, {passive:true});
-
-document.getElementById('restartBtn').addEventListener('click', ()=>{
-  window.scrollTo({top:0, behavior:'smooth'});
-});
-
-// ---------- drag to rotate (常時有効) ----------
-// canvasのtouch-action:pan-yにより縦スワイプはブラウザのネイティブスクロールに渡り
-// （縦パン開始時はpointercancelが飛んでくる）、横ドラッグだけが回転として届く。
-// デスクトップのホイールは何もpreventDefaultしないので従来通りページスクロールになる。
-const ROT_SENS=0.005;   // rad/px
-let dragging=false, lastX=0, rotVel=0;
-const cvEl=renderer.domElement;
-cvEl.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; rotVel=0; });
-addEventListener('pointermove', e=>{
-  if(!dragging) return;
-  const dx=e.clientX-lastX; lastX=e.clientX;
-  holder.rotation.y+=dx*ROT_SENS;
-  rotVel=dx*ROT_SENS;
-});
-addEventListener('pointerup', ()=>{ dragging=false; });
-addEventListener('pointercancel', ()=>{ dragging=false; rotVel=0; });   // 縦スクロールにジェスチャが移った場合
 
 // ---------- loop ----------
 function animate(){ requestAnimationFrame(animate);
+  tickPlay(performance.now());
   if(modelReady){
     applyProgress(progress);
-    applyCamera(progress);
     applyCaption(progress);
   }
-  if(!dragging && Math.abs(rotVel)>0.00004){ holder.rotation.y+=rotVel; rotVel*=0.94; }   // 軽い慣性
+  controls.update();
   renderer.render(scene,camera);
 }
-onScroll();
-applyCamera(0);
 animate();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);seamLineMat.resolution.set(innerWidth,innerHeight);});
 </script>

@@ -366,7 +366,7 @@ function refreshEng(){
 // ---------- load model ----------
 let boxMat=null;
 const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
-new GLTFLoader().load('models/saisenglb.glb', gltf=>{
+new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
   const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:FINISHES[finIdx].base, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
