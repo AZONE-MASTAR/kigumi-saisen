@@ -269,10 +269,12 @@ controls.autoRotate=true; controls.autoRotateSpeed=1.3;
 controls.target.set(0,1.15,0);
 
 // 竹の集成材テクスチャ（実写画像・トライプラナーUV）
-const bambooPhoto=new THREE.TextureLoader().load('textures/bamboo.jpg');
-bambooPhoto.wrapS=bambooPhoto.wrapT=THREE.RepeatWrapping;
-bambooPhoto.colorSpace=THREE.SRGBColorSpace;
-bambooPhoto.anisotropy=8;
+const texLoader=new THREE.TextureLoader();
+function bambooMap(url){ const t=texLoader.load(url); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t; }
+const bambooPhoto=bambooMap('textures/bamboo.jpg'); bambooPhoto.colorSpace=THREE.SRGBColorSpace;
+const bambooNormal=bambooMap('textures/bamboo_normal.png');
+const bambooRough=bambooMap('textures/bamboo_rough.jpg');
+const bambooBump=bambooMap('textures/bamboo_bump.jpg');
 function triplanarUV(geo,scale){
   const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
   const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
@@ -299,8 +301,8 @@ const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');
 
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
-  const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:0xd8b878,roughness:0.62,metalness:0.02});
-  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:0xad8a56,roughness:0.6,metalness:0.03});
+  const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xd8b878,roughness:0.62,metalness:0.02});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
   const engNodes=[];

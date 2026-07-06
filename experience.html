@@ -262,10 +262,12 @@ controls.enableDamping=true; controls.dampingFactor=0.08; controls.minDistance=2
 controls.maxPolarAngle=Math.PI*0.52; controls.enablePan=false; controls.target.set(0,1.2,0);
 
 // ---------- bamboo texture (実写画像・トライプラナーで全面に巻き付け) ----------
-const bambooPhoto=new THREE.TextureLoader().load('textures/bamboo.jpg');
-bambooPhoto.wrapS=bambooPhoto.wrapT=THREE.RepeatWrapping;
-bambooPhoto.colorSpace=THREE.SRGBColorSpace;
-bambooPhoto.anisotropy=8;
+const texLoader=new THREE.TextureLoader();
+function bambooMap(url){ const t=texLoader.load(url); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t; }
+const bambooPhoto=bambooMap('textures/bamboo.jpg'); bambooPhoto.colorSpace=THREE.SRGBColorSpace;   // 色（sRGB）
+const bambooNormal=bambooMap('textures/bamboo_normal.png');                                        // 法線（データ・リニア）
+const bambooRough=bambooMap('textures/bamboo_rough.jpg');                                          // ラフネス（データ・リニア）
+const bambooBump=bambooMap('textures/bamboo_bump.jpg');                                            // バンプ（データ・リニア）
 // triplanar UVs so vertical grain runs up on all vertical faces (STL has no UVs)
 function triplanarUV(geo, scale){
   const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
@@ -354,9 +356,9 @@ let boxMat=null;
 const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
-  boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, color:FINISHES[finIdx].base, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
+  boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:FINISHES[finIdx].base, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
-  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)は退避してノード名で対応付け
   const engNodes={};

@@ -148,10 +148,12 @@ function pedestal(x,z){
 const PED_TOP=0.70;
 
 // bamboo texture（実写画像・トライプラナーUV）+ triplanar UV (customizer と同じ)
-const bambooPhoto=new THREE.TextureLoader().load('textures/bamboo.jpg');
-bambooPhoto.wrapS=bambooPhoto.wrapT=THREE.RepeatWrapping;
-bambooPhoto.colorSpace=THREE.SRGBColorSpace;
-bambooPhoto.anisotropy=8;
+const texLoader=new THREE.TextureLoader();
+function bambooMap(url){ const t=texLoader.load(url); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t; }
+const bambooPhoto=bambooMap('textures/bamboo.jpg'); bambooPhoto.colorSpace=THREE.SRGBColorSpace;
+const bambooNormal=bambooMap('textures/bamboo_normal.png');
+const bambooRough=bambooMap('textures/bamboo_rough.jpg');
+const bambooBump=bambooMap('textures/bamboo_bump.jpg');
 function triplanarUV(geo,scale){
   const pos=geo.attributes.position,n=pos.count,uv=new Float32Array(n*2);
   const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
@@ -184,8 +186,8 @@ const loader=new GLTFLoader(); let loaded=0;
 PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
   loader.load(p.file, gltf=>{
     const root=gltf.scene;
-    const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:p.base,roughness:0.62,metalness:0.02,envMapIntensity:0.7});
-    const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:0xad8a56,roughness:0.6,metalness:0.03,envMapIntensity:0.6});   // 「茶色」＝橙マテリアルの部位（薄め）
+    const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:p.base,roughness:0.62,metalness:0.02,envMapIntensity:0.7});
+    const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03,envMapIntensity:0.6});   // 「茶色」＝橙マテリアルの部位（薄め）
     const isBrownM=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
     const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
     const engNodes=[];
