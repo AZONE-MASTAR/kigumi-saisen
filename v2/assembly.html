@@ -17,9 +17,12 @@
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
   body{overflow-x:hidden}
-  #app{position:fixed;inset:0;pointer-events:none;z-index:1}
-  #app canvas{display:block}
-  #spacer{position:relative;height:520vh;z-index:2}
+  /* canvasはドラッグ回転を受けるためpointer-events有効。touch-action:pan-yで
+     縦スワイプはブラウザのネイティブスクロール（＝組み立て操作）に任せ、横ドラッグだけ回転に使う */
+  #app{position:fixed;inset:0;z-index:1;user-select:none;-webkit-user-select:none}
+  #app canvas{display:block;touch-action:pan-y;cursor:grab}
+  #app canvas:active{cursor:grabbing}
+  #spacer{position:relative;height:520vh;z-index:2;pointer-events:none}  /* canvasへポインタを通す（スクロールはdocumentが処理するので影響なし） */
 
   #hdr{position:fixed;top:14px;left:16px;right:16px;z-index:35;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 12px;pointer-events:none}
   #hdr>*{pointer-events:auto}
@@ -247,6 +250,7 @@ function hashRange(i,salt,min,max){ return min+(hash(i*7.13+salt*3.71)*(max-min)
 // ---------- assembly state ----------
 let modelReady=false;
 let parts=[];         // {mesh,homePos,homeQuat,startPos,startQuat,startTime,duration}
+let brownMeshes=[];   // 「茶色」＝レーザー刻印の焼き色表現。爆発対象外・完成間際(p>=0.95)にのみ表示
 let modelCenter=new THREE.Vector3();
 let modelHeight=1;
 let engNodes={}; let engPlanesReady=false;
@@ -268,9 +272,14 @@ new GLTFLoader().load('models/saisenglb.glb', gltf=>{
     const brown=isBrown(o);
     o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
     o.material=brown?brownMat:boxMat; o.castShadow=true; o.receiveShadow=true;
+    // 「茶色」はレーザー刻印の焼き色表現なので独立パーツとして爆発させない。
+    // bbox計算(中心合わせ)にはこの時点で可視のまま含め、構図を従来と揃える。
+    // 表示制御はapplyProgressで行う（爆発中は非表示→完成間際に「最後に刻印が入る」演出）
+    if(brown){ brownMeshes.push(o); return; }
     bodyMeshes.push(o);
   });
-  bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（trave中に子を足すと無限再帰する地雷を回避）
+  bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（traverse中に子を足すと無限再帰する地雷を回避）
+  brownMeshes.forEach(addSeamEdges);  // 茶色にも継ぎ目輪郭（完成時に他パーツと見た目を揃える）
   root.updateMatrixWorld(true);
 
   // 中心合わせ＆スケール（刻印板を除いた本体のみのbbox）
@@ -368,9 +377,12 @@ function applyProgress(p){
     part.mesh.position.lerpVectors(part.startPos, part.homePos, e);
     part.mesh.quaternion.slerpQuaternions(part.startQuat, part.homeQuat, e);
   });
-  // 完成演出：p>=0.95で刻印を表示
+  // 完成演出：p>=0.95で刻印プレーンと「茶色」(焼き色表現)を表示
+  // 茶色は爆発対象外（常に最終位置）。爆発中に焼き色だけ宙に浮くと不自然なので隠し、
+  // 完成間際に「最後にレーザー刻印が入る」仕上げとして現す
   const done=p>=0.95;
   ENGRAVINGS.forEach(e=>{ if(e.plane) e.plane.visible=done; });
+  brownMeshes.forEach(m=>{ m.visible=done; });
 }
 
 function applyCamera(p){
@@ -420,6 +432,23 @@ document.getElementById('restartBtn').addEventListener('click', ()=>{
   window.scrollTo({top:0, behavior:'smooth'});
 });
 
+// ---------- drag to rotate (常時有効) ----------
+// canvasのtouch-action:pan-yにより縦スワイプはブラウザのネイティブスクロールに渡り
+// （縦パン開始時はpointercancelが飛んでくる）、横ドラッグだけが回転として届く。
+// デスクトップのホイールは何もpreventDefaultしないので従来通りページスクロールになる。
+const ROT_SENS=0.005;   // rad/px
+let dragging=false, lastX=0, rotVel=0;
+const cvEl=renderer.domElement;
+cvEl.addEventListener('pointerdown', e=>{ dragging=true; lastX=e.clientX; rotVel=0; });
+addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  const dx=e.clientX-lastX; lastX=e.clientX;
+  holder.rotation.y+=dx*ROT_SENS;
+  rotVel=dx*ROT_SENS;
+});
+addEventListener('pointerup', ()=>{ dragging=false; });
+addEventListener('pointercancel', ()=>{ dragging=false; rotVel=0; });   // 縦スクロールにジェスチャが移った場合
+
 // ---------- loop ----------
 function animate(){ requestAnimationFrame(animate);
   if(modelReady){
@@ -427,6 +456,7 @@ function animate(){ requestAnimationFrame(animate);
     applyCamera(progress);
     applyCaption(progress);
   }
+  if(!dragging && Math.abs(rotVel)>0.00004){ holder.rotation.y+=rotVel; rotVel*=0.94; }   // 軽い慣性
   renderer.render(scene,camera);
 }
 onScroll();
