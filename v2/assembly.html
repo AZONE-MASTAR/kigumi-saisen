@@ -332,6 +332,7 @@ new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
   // 爆発オフセットはワールド寸法(modelHeight基準)で決めるため、ローカルに足す際は 1/sc して
   // 「ワールドで見て正しい距離」になるよう補正する（そのままだと二重にスケールされ、ほぼ動いて見えなくなる）。
   const N=bodyMeshes.length;
+  const GOLDEN_ANGLE=Math.PI*(3-Math.sqrt(5));   // 黄金角。フィボナッチ螺旋でパーツを均等に分散させる
   const tmpBB=new THREE.Box3();
   const rawParts=bodyMeshes.map((mesh,idx)=>{
     // mesh.geometry のみからbboxを取る（setFromObjectだと継ぎ目輪郭のLineSegments2子要素を
@@ -339,30 +340,48 @@ new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
     if(!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     tmpBB.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
     const partCenterWorld=new THREE.Vector3(); tmpBB.getCenter(partCenterWorld);
-    let dir=partCenterWorld.clone().sub(modelCenter);
-    if(dir.lengthSq()<1e-6){
-      // ほぼ中心のパーツは擬似乱数で適当な軸方向へ
-      dir.set(hashRange(idx,1,-1,1), hashRange(idx,2,-0.3,1), hashRange(idx,3,-1,1));
-      if(dir.lengthSq()<1e-6) dir.set(0,1,0);
-    }
-    dir.normalize();
-    // 爆発距離：広めのレンジ＋二乗歪みで距離のばらつきを強調（均一な球殻状にならないように）
+    const partSize=new THREE.Vector3(); tmpBB.getSize(partSize);
+    const partBottomY=tmpBB.min.y;                       // 組み立て時のこのパーツの最下点（ワールドY）
+    const partRadius=partSize.length()*0.5;              // パーツ自身の概算半径（大きいパーツほど遠くへ）
+
+    // 方向：フィボナッチ螺旋（黄金角）でインデックスごとに水平角を均等配置し、
+    // Y成分は常に正（上半球側）に制限＝「上方向優先」。近接パーツの爆発先が重なりにくくなる
+    const az=idx*GOLDEN_ANGLE;                           // 方位角（0〜2π・インデックスで均等に回る）
+    const upT=(idx+0.5)/N;                                // 0〜1：上に行くほど大きいインデックス側に割り当て
+    const yBias=0.35+upT*0.65;                            // Y成分の比率(0.35〜1.0・常に正＝上向き優先)
+    const horizR=Math.sqrt(Math.max(0,1-yBias*yBias));    // 単位ベクトルになるよう水平成分を正規化
+    const dir=new THREE.Vector3(Math.cos(az)*horizR, yBias, Math.sin(az)*horizR).normalize();
+
+    // 爆発距離：モデル寸法に加え、パーツ自身の大きさに応じてスケール（大きいパーツほど離す→重なり低減）
     const distT=hash(idx*7.13+4*3.71);
-    const dist=modelHeight*(1.4+(distT*distT)*(2.2-1.4)*1.35);   // 約1.4〜2.5×modelHeight・近距離寄りに偏らせつつ遠くまで散らす
+    const baseDist=modelHeight*(1.1+(distT*distT)*(2.0-1.1));   // 約1.1〜2.1×modelHeight
+    const dist=baseDist+partRadius*1.6;
     const explodedOffsetWorld=dir.multiplyScalar(dist);
-    // 放射方向に加えて上下方向のスキャッターを追加（浮くパーツ・沈むパーツが混ざる立体的な散らばり）
-    explodedOffsetWorld.y+=modelHeight*hashRange(idx,9,-0.65,0.95);
+
+    // 床(y=0・組み上がったモデルの最下面)より下に絶対に行かないようクランプ。
+    // 「このパーツの最下点+オフセットのY」が0を下回るなら、下回らない分だけ持ち上げる
+    const explodedBottomY=partBottomY+explodedOffsetWorld.y;
+    if(explodedBottomY<0){ explodedOffsetWorld.y+=(0-explodedBottomY); }
+
     const explodedOffsetLocal=explodedOffsetWorld.clone().divideScalar(sc);   // ローカル座標に変換（boxGroupのスケールを打ち消す）
     // 回転は与えない：パーツは組み立て時と同じ向きのまま、位置だけ離す
     return {
       mesh,
       homePos: mesh.position.clone(),          // 元の(=組み上がった)位置：ローカルではほぼ(0,0,0)
       startPos: mesh.position.clone().add(explodedOffsetLocal),
-      centerY: partCenterWorld.y
+      centerY: partCenterWorld.y,
+      az                                        // 方位角（組み立て順の水平分散に利用）
     };
   });
-  // 組み立て順：重心Yの昇順（下の土台から上の鳥居・注連縄へ）
-  rawParts.sort((a,b)=>a.centerY-b.centerY);
+  // 組み立て順：重心Yの昇順（下の土台から上の鳥居・注連縄へ）を基本に、
+  // 同程度の高さのパーツ同士は方位角(az)でも分散させ、出発点→到達点の経路が
+  // 他パーツの最終位置と重なりにくいようにする（Yを主キー・粗いバケツ、azを副キーでソート）
+  const Y_BUCKET=modelHeight*0.12;
+  rawParts.sort((a,b)=>{
+    const ba=Math.floor(a.centerY/Y_BUCKET), bb=Math.floor(b.centerY/Y_BUCKET);
+    if(ba!==bb) return ba-bb;
+    return a.az-b.az;
+  });
   rawParts.forEach((p,i)=>{
     p.start=(i/N)*0.85;
     p.duration=0.25;
