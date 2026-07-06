@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ki-gu-mi 賽銭貯金箱 — 組み上がる体験</title>
+<meta name="description" content="48の木組みパーツが、スクロールとともに一台の賽銭貯金箱へ組み上がっていく体験。ki-gu-mi・大分自社工場の手仕事を3Dで。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#efe9dc; --wash:#f6f1e7; --panel:#fffdf8; --ink:#2a251d; --muted:#7c7261; --line:#e0d8c6;
+    --accent:#5c7d4c; --accent-d:#456039; --gold:#a9812f; --take:#c9a75f;
+    --mincho:"Shippori Mincho B1",serif; --old:"Zen Old Mincho",serif; --sans:"Zen Kaku Gothic New",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  body{overflow-x:hidden}
+  #app{position:fixed;inset:0;pointer-events:none;z-index:1}
+  #app canvas{display:block}
+  #spacer{position:relative;height:520vh;z-index:2}
+
+  #hdr{position:fixed;top:14px;left:16px;right:16px;z-index:35;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:8px 12px;pointer-events:none}
+  #hdr>*{pointer-events:auto}
+  #brand{font-family:var(--mincho);font-weight:700;font-size:18px;letter-spacing:.08em;color:var(--ink)}
+  #brand .en{font-family:var(--sans);font-weight:500;font-size:10.5px;letter-spacing:.18em;color:var(--muted);display:block;margin-top:1px}
+  #madein{display:flex;gap:7px;align-items:center;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:6px 13px;white-space:nowrap}
+  #madein b{color:var(--accent-d)}
+  .dotjp{width:9px;height:9px;border-radius:50%;background:#bc002d;flex:none}
+
+  /* loader */
+  #loader{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(120% 100% at 50% 20%,#f6f1e7,#e6ddc9)}
+  #loader .ring{width:44px;height:44px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loader .t{margin-top:16px;font-family:var(--mincho);font-size:15px;letter-spacing:.08em;color:var(--muted)}
+
+  /* progress rail */
+  #rail{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--gold));z-index:36;width:0%;transition:width .05s linear}
+
+  /* scroll hint */
+  #scrollhint{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:11px;letter-spacing:.08em;opacity:0;transition:opacity .5s;pointer-events:none}
+  #scrollhint.show{opacity:1}
+  #scrollhint .chev{width:18px;height:18px;border-right:2px solid var(--accent-d);border-bottom:2px solid var(--accent-d);transform:rotate(45deg);animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:rotate(45deg) translate(0,0)}50%{transform:rotate(45deg) translate(4px,4px)}}
+
+  /* caption */
+  #caption{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:24;width:min(560px,92vw);text-align:center;pointer-events:none}
+  #caption .line{position:absolute;left:0;right:0;top:0;opacity:0;transition:opacity .6s ease;font-family:var(--mincho);font-weight:700;font-size:clamp(17px,3vw,25px);color:var(--ink);letter-spacing:.03em;text-shadow:0 2px 18px rgba(255,253,248,.9),0 0 4px rgba(255,253,248,.7)}
+  #caption .line.on{opacity:1;position:relative}
+  #caption .line:not(.on){position:absolute}
+  #ctaWrap{margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease;pointer-events:none}
+  #ctaWrap.show{opacity:1;transform:translateY(0);pointer-events:auto}
+  .ctabtn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;text-decoration:none;padding:13px 22px;border-radius:30px;transition:transform .15s,box-shadow .15s;font-family:var(--sans);border:none;cursor:pointer}
+  .ctabtn.main{background:var(--accent);color:#fff;box-shadow:0 12px 28px rgba(92,125,76,.34)}
+  .ctabtn.main:hover{transform:translateY(-2px)}
+  .ctabtn.ghost{background:rgba(255,253,248,.85);border:1px solid var(--line);color:var(--ink)}
+  .ctabtn.ghost:hover{border-color:var(--accent)}
+
+  @media(max-width:700px){
+    #brand{font-size:14.5px}
+    #brand .en{font-size:9px;letter-spacing:.1em}
+    #madein{font-size:9.5px;padding:5px 10px;gap:5px}
+    #caption{bottom:54px;width:94vw}
+    #caption .line{font-size:clamp(14.5px,4vw,19px)}
+    .ctabtn{font-size:12.5px;padding:11px 17px}
+    #scrollhint{bottom:18px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="rail"></div>
+
+<div id="hdr">
+  <div id="brand">ki-gu-mi 賽銭貯金箱<span class="en"><a href="experience.html" style="color:var(--accent-d);text-decoration:none">← カスタム</a>　·　<a href="index.html" style="color:var(--muted);text-decoration:none">ホーム</a></span></div>
+  <div id="madein"><span class="dotjp"></span><b>MADE IN JAPAN</b>／大分・自社工場</div>
+</div>
+
+<div id="loader"><div class="ring"></div><div class="t" id="lt">竹を削り出しています…</div></div>
+
+<div id="scrollhint"><span>SCROLL して組み立てる</span><div class="chev"></div></div>
+
+<div id="caption">
+  <div style="position:relative;height:1.6em">
+    <div class="line" data-i="0">48のパーツ、ひとつの箱へ。</div>
+    <div class="line" data-i="1">組む、たのしみ。</div>
+    <div class="line" data-i="2">あなただけの一台に。</div>
+  </div>
+  <div id="ctaWrap">
+    <a class="ctabtn main" href="custom.html">この一台に、名前を入れる →</a>
+    <button class="ctabtn ghost" id="restartBtn" type="button">もう一度組み立てる</button>
+  </div>
+</div>
+
+<div id="spacer"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+
+// ---------- options (刻印はデフォルト表示のみ・編集UIなし) ----------
+const FONTS=[{n:'明朝',css:'"Shippori Mincho B1", serif'}];
+const ENG_COLOR='#9c7846';
+const ENGRAVINGS=[
+  {id:'main',  match:'大きな', def:'賽銭箱', fill:0.36, weight:700, pscale:1.0},
+  {id:'seal1', match:'刻印1',  def:'開',     fill:0.90, weight:700, pscale:1.18},
+  {id:'seal2', match:'刻印2',  def:'運',     fill:0.90, weight:700, pscale:1.18}
+];
+const fontIdx=0;
+
+// ---------- three ----------
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,0.1,200);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;
+document.getElementById('app').appendChild(renderer.domElement);
+// warm studio backdrop
+const bg=(function(){const cv=document.createElement('canvas');cv.width=cv.height=512;const x=cv.getContext('2d');
+  const g=x.createRadialGradient(256,170,40,256,300,540);g.addColorStop(0,'#faf5ea');g.addColorStop(0.6,'#ece3d0');g.addColorStop(1,'#ddd1b8');
+  x.fillStyle=g;x.fillRect(0,0,512,512);const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;})();
+scene.background=bg;
+const pmrem=new THREE.PMREMGenerator(renderer); scene.environment=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+scene.add(new THREE.HemisphereLight(0xfff4e0,0x6b6250,0.7));
+scene.add(new THREE.AmbientLight(0xffffff,0.35));
+const key=new THREE.DirectionalLight(0xfff3df,2.5); key.position.set(1.5,6,9); key.castShadow=true;
+key.shadow.mapSize.set(2048,2048); key.shadow.camera.near=1; key.shadow.camera.far=40; key.shadow.bias=-0.0004;
+key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=8;key.shadow.camera.bottom=-8; scene.add(key);
+const fillL=new THREE.DirectionalLight(0xffffff,0.45); fillL.position.set(-5,3,5); scene.add(fillL);
+
+// ground shadow
+const ground=new THREE.Mesh(new THREE.CircleGeometry(40,48),new THREE.ShadowMaterial({opacity:0.22}));
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+const holder=new THREE.Group(); scene.add(holder);
+
+// ---------- bamboo texture ----------
+const texLoader=new THREE.TextureLoader();
+function bambooMap(url){ const t=texLoader.load(url); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t; }
+const bambooPhoto=bambooMap('../textures/bamboo.jpg'); bambooPhoto.colorSpace=THREE.SRGBColorSpace;
+const bambooNormal=bambooMap('../textures/bamboo_normal.png');
+const bambooRough=bambooMap('../textures/bamboo_rough.jpg');
+const bambooBump=bambooMap('../textures/bamboo_bump.jpg');
+const seamLineMat=new LineMaterial({color:0x5a3d22, transparent:true, opacity:0.55, linewidth:2.4});
+seamLineMat.resolution.set(innerWidth, innerHeight);
+function addSeamEdges(mesh){
+  const eg=new THREE.EdgesGeometry(mesh.geometry, 20);
+  const lsg=new LineSegmentsGeometry().setPositions(eg.attributes.position.array);
+  const seg=new LineSegments2(lsg, seamLineMat); seg.renderOrder=2; seg.computeLineDistances();
+  mesh.add(seg);
+}
+function triplanarUV(geo, scale){
+  const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
+  const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
+  for(let i=0;i<n;i+=3){ A.fromBufferAttribute(pos,i);B.fromBufferAttribute(pos,i+1);C.fromBufferAttribute(pos,i+2);
+    ab.subVectors(B,A);ac.subVectors(C,A);nr.crossVectors(ab,ac);
+    const ax=Math.abs(nr.x),ay=Math.abs(nr.y),az=Math.abs(nr.z);
+    const V=[A,B,C];
+    for(let j=0;j<3;j++){ const v=V[j]; let u,w;
+      if(ay>=ax&&ay>=az){ u=v.x; w=v.z; } else if(ax>=az){ u=v.z; w=v.y; } else { u=v.x; w=v.y; }
+      uv[(i+j)*2]=u*scale; uv[(i+j)*2+1]=w*scale;
+    }
+  }
+  geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+}
+
+// ---------- engraving planes ----------
+function engLayout(ctx, text, W, H, fill, weight){
+  const lines=text.split('\n').slice(0,2);
+  const lh=1.22;
+  let fs=Math.round(H*fill*(lines.length>1?0.72:1));
+  ctx.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
+  const maxW=W*0.94, maxBlockH=H*0.92;
+  const fits=()=>lines.every(l=>ctx.measureText(l).width<=maxW) && fs*lh*lines.length<=maxBlockH;
+  while(!fits() && fs>16){ fs-=4; ctx.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
+  return {lines, fs, lh, cx:W/2, cy0:H*0.54-(lines.length-1)*fs*lh/2};
+}
+function makeEngTex(text, aspect, fill, weight){
+  fill=fill||0.72; weight=weight||700;
+  const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  x.clearRect(0,0,W,H);
+  if(text){ x.textAlign='center'; x.textBaseline='middle';
+    const {lines,fs,lh,cx,cy0}=engLayout(x,text,W,H,fill,weight);
+    x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
+    x.fillStyle=ENG_COLOR;
+    lines.forEach((l,i)=>x.fillText(l,cx,cy0+i*fs*lh));
+  }
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+function makeEngNormal(text, aspect, fill, weight){
+  if(!text) return null;
+  fill=fill||0.72; weight=weight||700;
+  const NW=512, NH=Math.max(32,Math.round(NW/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=NW; cv.height=NH; const x=cv.getContext('2d');
+  x.fillStyle='#000'; x.fillRect(0,0,NW,NH);
+  x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#fff';
+  x.filter='blur(5px)';
+  const {lines,fs,lh,cx,cy0}=engLayout(x,text,NW,NH,fill,weight);
+  lines.forEach((l,i)=>x.fillText(l,cx,cy0+i*fs*lh));
+  x.filter='none';
+  const src=x.getImageData(0,0,NW,NH);
+  const out=x.createImageData(NW,NH);
+  const strength=1.6;
+  for(let y=0;y<NH;y++){
+    for(let px=0;px<NW;px++){
+      const i=(y*NW+px)*4;
+      const hL=src.data[(y*NW+Math.max(px-1,0))*4];
+      const hR=src.data[(y*NW+Math.min(px+1,NW-1))*4];
+      const hU=src.data[(Math.max(y-1,0)*NW+px)*4];
+      const hD=src.data[(Math.min(y+1,NH-1)*NW+px)*4];
+      let nx=(hL-hR)/255*strength, ny=(hU-hD)/255*strength, nz=1;
+      const len=Math.sqrt(nx*nx+ny*ny+nz*nz); nx/=len; ny/=len; nz/=len;
+      out.data[i]=Math.round((nx*0.5+0.5)*255); out.data[i+1]=Math.round((ny*0.5+0.5)*255); out.data[i+2]=Math.round((nz*0.5+0.5)*255); out.data[i+3]=255;
+    }
+  }
+  x.putImageData(out,0,0);
+  return new THREE.CanvasTexture(cv);
+}
+function refreshEng(){
+  ENGRAVINGS.forEach(e=>{ if(!e.plane) return;
+    const m=e.plane.material;
+    m.map=makeEngTex(e.def, e.aspect, e.fill, e.weight);
+    m.normalMap=makeEngNormal(e.def, e.aspect, e.fill, e.weight);
+    m.normalScale.set(0.55,0.55);
+    m.needsUpdate=true;
+  });
+}
+
+// ---------- deterministic pseudo-random (index-seeded) ----------
+function hash(i){ const s=Math.sin(i*12.9898+78.233)*43758.5453; return s-Math.floor(s); }
+function hashRange(i,salt,min,max){ return min+(hash(i*7.13+salt*3.71)*(max-min)); }
+
+// ---------- assembly state ----------
+let modelReady=false;
+let parts=[];         // {mesh,homePos,homeQuat,startPos,startQuat,startTime,duration}
+let modelCenter=new THREE.Vector3();
+let modelHeight=1;
+let engNodes={}; let engPlanesReady=false;
+
+const easeOutCubic=t=>1-Math.pow(1-t,3);
+const clamp01=t=>Math.max(0,Math.min(1,t));
+
+new GLTFLoader().load('models/saisenglb.glb', gltf=>{
+  const root=gltf.scene;
+  const boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xd8b878, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
+  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
+  const bodyMeshes=[];
+  root.traverse(o=>{
+    if(!o.isMesh) return;
+    const eng=ENGRAVINGS.find(e=>o.name.includes(e.match));
+    if(eng){ engNodes[eng.id]=o; o.visible=false; return; }
+    if(o.name==='文字'){ o.visible=false; return; }
+    const brown=isBrown(o);
+    o.geometry.computeVertexNormals(); triplanarUV(o.geometry, 1/42);
+    o.material=brown?brownMat:boxMat; o.castShadow=true; o.receiveShadow=true;
+    bodyMeshes.push(o);
+  });
+  bodyMeshes.forEach(addSeamEdges);   // traverse完了後に追加（trave中に子を足すと無限再帰する地雷を回避）
+  root.updateMatrixWorld(true);
+
+  // 中心合わせ＆スケール（刻印板を除いた本体のみのbbox）
+  const bb=new THREE.Box3(); root.traverse(o=>{ if(o.isMesh && o.visible) bb.expandByObject(o); });
+  const size=new THREE.Vector3(), ctr=new THREE.Vector3(); bb.getSize(size); bb.getCenter(ctr);
+  const boxGroup=new THREE.Group(); boxGroup.add(root); root.position.set(-ctr.x,-ctr.y,-ctr.z);
+  const targetH=2.2, sc=targetH/Math.max(size.y,0.001);
+  boxGroup.scale.setScalar(sc); boxGroup.position.y=(size.y*sc)/2;
+  holder.add(boxGroup); holder.updateMatrixWorld(true);
+  modelHeight=size.y*sc;
+  modelCenter.set(0, modelHeight/2, 0);
+
+  // 刻印プレーン：組み上がった状態（爆発オフセット適用前）でのレイキャスト配置
+  const rc=new THREE.Raycaster(); rc.camera=camera;
+  ENGRAVINGS.forEach(e=>{
+    const node=engNodes[e.id]; if(!node) return;
+    node.updateWorldMatrix(true,false);
+    const wp=new THREE.Vector3(), wq=new THREE.Quaternion(), wsc=new THREE.Vector3();
+    node.matrixWorld.decompose(wp,wq,wsc);
+    const ps=e.pscale||1;
+    const W=Math.max(Math.abs(wsc.x)*2*ps,0.02), H=Math.max(Math.abs(wsc.y)*2*ps,0.02);
+    e.aspect=W/H;
+    let n=new THREE.Vector3(0,0,1).applyQuaternion(wq); if(n.z<0) n.negate(); n.normalize();
+    const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1), n);
+    rc.set(wp.clone().addScaledVector(n, 0.35), n.clone().negate());
+    const hit=rc.intersectObject(boxGroup, true)[0];
+    const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n, 0.003);
+    const mat=new THREE.MeshStandardMaterial({transparent:true, alphaTest:0.5, blending:THREE.CustomBlending, blendEquation:THREE.AddEquation, blendSrc:THREE.DstColorFactor, blendDst:THREE.OneMinusSrcAlphaFactor, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
+    plane.quaternion.copy(q);
+    plane.position.copy(pos);
+    plane.renderOrder=3; plane.visible=false;
+    holder.add(plane); e.plane=plane;
+  });
+  refreshEng(); engPlanesReady=true;
+
+  // ---------- パーツごとの爆発初期値・組み立て順を計算 ----------
+  // 注意：mesh.position はroot直下のローカル座標（rootはboxGroup内でsc倍される）。
+  // 爆発オフセットはワールド寸法(modelHeight基準)で決めるため、ローカルに足す際は 1/sc して
+  // 「ワールドで見て正しい距離」になるよう補正する（そのままだと二重にスケールされ、ほぼ動いて見えなくなる）。
+  const N=bodyMeshes.length;
+  const tmpBB=new THREE.Box3();
+  const rawParts=bodyMeshes.map((mesh,idx)=>{
+    // mesh.geometry のみからbboxを取る（setFromObjectだと継ぎ目輪郭のLineSegments2子要素を
+    // 巻き込んで異常に大きい/おかしなbboxになることがあるため、ジオメトリ単体→matrixWorldで変換）
+    if(!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    tmpBB.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+    const partCenterWorld=new THREE.Vector3(); tmpBB.getCenter(partCenterWorld);
+    let dir=partCenterWorld.clone().sub(modelCenter);
+    if(dir.lengthSq()<1e-6){
+      // ほぼ中心のパーツは擬似乱数で適当な軸方向へ
+      dir.set(hashRange(idx,1,-1,1), hashRange(idx,2,-0.3,1), hashRange(idx,3,-1,1));
+      if(dir.lengthSq()<1e-6) dir.set(0,1,0);
+    }
+    dir.normalize();
+    const dist=modelHeight*hashRange(idx,4,0.75,1.05);         // ワールド単位での爆発距離
+    const explodedOffsetWorld=dir.multiplyScalar(dist);
+    const explodedOffsetLocal=explodedOffsetWorld.clone().divideScalar(sc);   // ローカル座標に変換（boxGroupのスケールを打ち消す）
+    // 初期回転：軸・角度はインデックスから決定論的に生成（最大25°程度）
+    const axis=new THREE.Vector3(hashRange(idx,5,-1,1),hashRange(idx,6,-1,1),hashRange(idx,7,-1,1));
+    if(axis.lengthSq()<1e-6) axis.set(0,1,0); axis.normalize();
+    const angle=THREE.MathUtils.degToRad(hashRange(idx,8,-25,25));
+    const startQuat=new THREE.Quaternion().setFromAxisAngle(axis,angle);
+    return {
+      mesh,
+      homePos: mesh.position.clone(),          // 元の(=組み上がった)位置：ローカルではほぼ(0,0,0)
+      homeQuat: mesh.quaternion.clone(),
+      startPos: mesh.position.clone().add(explodedOffsetLocal),
+      startQuat,
+      centerY: partCenterWorld.y
+    };
+  });
+  // 組み立て順：重心Yの昇順（下の土台から上の鳥居・注連縄へ）
+  rawParts.sort((a,b)=>a.centerY-b.centerY);
+  rawParts.forEach((p,i)=>{
+    p.start=(i/N)*0.85;
+    p.duration=0.25;
+  });
+  parts=rawParts;
+
+  // 初期状態を爆発図に反映
+  applyProgress(0);
+
+  document.getElementById('loader').style.display='none';
+  document.getElementById('scrollhint').classList.add('show');
+  modelReady=true;
+}, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
+  err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
+
+// ---------- progress -> pose ----------
+function applyProgress(p){
+  parts.forEach(part=>{
+    const t=clamp01((p-part.start)/part.duration);
+    const e=easeOutCubic(t);
+    part.mesh.position.lerpVectors(part.startPos, part.homePos, e);
+    part.mesh.quaternion.slerpQuaternions(part.startQuat, part.homeQuat, e);
+  });
+  // 完成演出：p>=0.95で刻印を表示
+  const done=p>=0.95;
+  ENGRAVINGS.forEach(e=>{ if(e.plane) e.plane.visible=done; });
+}
+
+function applyCamera(p){
+  // 縦長（スマホ）では水平FOVが狭くなるぶん、爆発時の横方向の広がりが画面外に出やすいので
+  // アスペクト比が1未満のときは引きを追加補正する
+  const aspectComp = camera.aspect<1 ? Math.min(1/camera.aspect, 1.8) : 1;
+  const dist=THREE.MathUtils.lerp(modelHeight*8.6*aspectComp, modelHeight*2.7*Math.max(aspectComp*0.85,1), p);
+  const azimuthDeg=THREE.MathUtils.lerp(-25,10,p);
+  const azimuth=THREE.MathUtils.degToRad(azimuthDeg);
+  const camY=modelHeight*0.5;
+  const camX=Math.sin(azimuth)*dist;
+  const camZ=Math.cos(azimuth)*dist;
+  camera.position.set(camX, camY, camZ);
+  const lookY=modelHeight*THREE.MathUtils.lerp(0.38,0.5,p);
+  camera.lookAt(0, lookY, 0);
+}
+
+// ---------- caption ----------
+const captionLines=[...document.querySelectorAll('#caption .line')];
+const ctaWrap=document.getElementById('ctaWrap');
+let curCaption=-1;
+function applyCaption(p){
+  let idx;
+  if(p<0.33) idx=0; else if(p<0.85) idx=1; else idx=2;
+  if(idx!==curCaption){
+    captionLines.forEach((el,i)=>el.classList.toggle('on', i===idx));
+    curCaption=idx;
+  }
+  ctaWrap.classList.toggle('show', p>=0.95);
+}
+
+// ---------- scroll-driven progress ----------
+let progress=0;
+function computeProgress(){
+  const doc=document.documentElement;
+  const maxScroll=Math.max(1, doc.scrollHeight-innerHeight);
+  return clamp01(scrollY/maxScroll);
+}
+function onScroll(){
+  progress=computeProgress();
+  document.getElementById('rail').style.width=(progress*100)+'%';
+  if(progress>0.02) document.getElementById('scrollhint').classList.remove('show');
+}
+addEventListener('scroll', onScroll, {passive:true});
+
+document.getElementById('restartBtn').addEventListener('click', ()=>{
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+
+// ---------- loop ----------
+function animate(){ requestAnimationFrame(animate);
+  if(modelReady){
+    applyProgress(progress);
+    applyCamera(progress);
+    applyCaption(progress);
+  }
+  renderer.render(scene,camera);
+}
+onScroll();
+applyCamera(0);
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);seamLineMat.resolution.set(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
