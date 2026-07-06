@@ -411,9 +411,13 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
     if(ba!==bb) return ba-bb;
     return a.az-b.az;
   });
+  // 各パーツのアニメ窓を [0,1] 内に収める：最後(最上部)のパーツが start+duration>1 になると
+  // p=1でも組み上がりきらず浮いて見える（特に本体010＝笠木は爆発オフセット最大なので顕著）。
+  // start を (i/(N-1))*(1-duration) にして、i=0は[0,dur]、i=N-1はちょうど[1-dur,1]で完了させる。
+  const DUR=0.25;
   rawParts.forEach((p,i)=>{
-    p.start=(i/N)*0.85;
-    p.duration=0.25;
+    p.start = N<=1 ? 0 : (i/(N-1))*(1-DUR);
+    p.duration=DUR;
   });
   parts=rawParts;
 
