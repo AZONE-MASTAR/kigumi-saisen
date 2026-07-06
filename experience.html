@@ -261,26 +261,11 @@ const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableDamping=true; controls.dampingFactor=0.08; controls.minDistance=2.6; controls.maxDistance=11;
 controls.maxPolarAngle=Math.PI*0.52; controls.enablePan=false; controls.target.set(0,1.2,0);
 
-// ---------- bamboo texture (procedural laminated bamboo) ----------
-function bambooTex(baseHex){
-  const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const x=cv.getContext('2d');
-  const base='#'+baseHex.toString(16).padStart(6,'0');
-  x.fillStyle=base; x.fillRect(0,0,256,512);
-  // laminated strips (vertical columns = 集成材の竹ひご)
-  const cols=8, cw=256/cols;
-  for(let c=0;c<cols;c++){ const shade=(Math.sin(c*1.7)*0.5+0.5);
-    x.fillStyle=`rgba(${shade>0.5?255:0},${shade>0.5?255:0},${shade>0.5?255:0},${0.05+shade*0.05})`; x.fillRect(c*cw,0,cw,512);
-    // strip divider
-    x.fillStyle='rgba(60,40,18,0.22)'; x.fillRect(c*cw,0,1.4,512);
-    // vertical grain fibers
-    for(let g=0; g<7; g++){ const gx=c*cw+2+Math.random()*(cw-4); x.strokeStyle=`rgba(70,48,20,${0.05+Math.random()*0.09})`; x.lineWidth=0.6+Math.random()*0.7;
-      x.beginPath(); x.moveTo(gx,0); x.bezierCurveTo(gx+2,170,gx-2,340,gx,512); x.stroke(); }
-    // bamboo nodes (節)
-    if(Math.random()<0.7){ const ny=60+Math.random()*400; x.strokeStyle='rgba(90,60,26,0.28)'; x.lineWidth=1.6;
-      x.beginPath(); x.moveTo(c*cw+1,ny); x.lineTo(c*cw+cw-1,ny+ (Math.random()*4-2)); x.stroke(); }
-  }
-  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t;
-}
+// ---------- bamboo texture (実写画像・トライプラナーで全面に巻き付け) ----------
+const bambooPhoto=new THREE.TextureLoader().load('textures/bamboo.jpg');
+bambooPhoto.wrapS=bambooPhoto.wrapT=THREE.RepeatWrapping;
+bambooPhoto.colorSpace=THREE.SRGBColorSpace;
+bambooPhoto.anisotropy=8;
 // triplanar UVs so vertical grain runs up on all vertical faces (STL has no UVs)
 function triplanarUV(geo, scale){
   const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
@@ -313,7 +298,7 @@ function makeEngTex(text, aspect, fill, weight){
   fill=fill||0.72; weight=weight||700;
   const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  x.clearRect(0,0,W,H);
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);            // 乗算合成の下地は白（＝竹目に影響しない）。文字部分だけ焼き色で暗くする
   if(text){ x.textAlign='center'; x.textBaseline='middle';
     const {lines,fs,lh,cx,cy0}=engLayout(x,text,W,H,fill,weight);
     // 薄い焼き色でやわらかく（重い黒縁は無し）
@@ -369,9 +354,9 @@ let boxMat=null;
 const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
-  boxMat=new THREE.MeshStandardMaterial({map:bambooTex(FINISHES[finIdx].base), color:0xffffff, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
+  boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, color:FINISHES[finIdx].base, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
-  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0xad8a56), color:0xffffff, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)は退避してノード名で対応付け
   const engNodes={};
@@ -408,7 +393,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
     rc.set(wp.clone().addScaledVector(n, 0.35), n.clone().negate());
     const hit=rc.intersectObject(boxGroup, true)[0];
     const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n, 0.003);
-    const mat=new THREE.MeshStandardMaterial({transparent:true, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+    const mat=new THREE.MeshStandardMaterial({transparent:true, blending:THREE.MultiplyBlending, roughness:0.55, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
     const plane=new THREE.Mesh(new THREE.PlaneGeometry(W,H), mat);
     plane.quaternion.copy(q);
     plane.position.copy(pos);
@@ -433,7 +418,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
 
-function applyFinish(){ if(boxMat){ boxMat.map=bambooTex(FINISHES[finIdx].base); boxMat.needsUpdate=true; } }
+function applyFinish(){ if(boxMat){ boxMat.color.setHex(FINISHES[finIdx].base); boxMat.needsUpdate=true; } }
 
 // ---------- UI ----------
 function chip(wrap,arr,cur,fn,label){ wrap.innerHTML=''; arr.forEach((o,i)=>{ const b=document.createElement('div'); b.className='opt'+(i===cur?' sel':'');

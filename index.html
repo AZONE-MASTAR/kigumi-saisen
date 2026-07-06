@@ -268,20 +268,11 @@ controls.minPolarAngle=Math.PI*0.3; controls.maxPolarAngle=Math.PI*0.54;
 controls.autoRotate=true; controls.autoRotateSpeed=1.3;
 controls.target.set(0,1.15,0);
 
-// 竹の集成材テクスチャ（customizerと同じ生成ロジック）
-function bambooTex(baseHex){
-  const cv=document.createElement('canvas'); cv.width=256; cv.height=512; const x=cv.getContext('2d');
-  x.fillStyle='#'+baseHex.toString(16).padStart(6,'0'); x.fillRect(0,0,256,512);
-  const cols=8, cw=256/cols;
-  for(let c=0;c<cols;c++){
-    x.fillStyle='rgba(60,40,18,0.22)'; x.fillRect(c*cw,0,1.4,512);
-    for(let g=0; g<6; g++){ const gx=c*cw+2+Math.random()*(cw-4); x.strokeStyle=`rgba(70,48,20,${0.05+Math.random()*0.08})`; x.lineWidth=0.6+Math.random()*0.6;
-      x.beginPath(); x.moveTo(gx,0); x.bezierCurveTo(gx+2,170,gx-2,340,gx,512); x.stroke(); }
-    if(Math.random()<0.7){ const ny=60+Math.random()*400; x.strokeStyle='rgba(90,60,26,0.26)'; x.lineWidth=1.5;
-      x.beginPath(); x.moveTo(c*cw+1,ny); x.lineTo(c*cw+cw-1,ny); x.stroke(); }
-  }
-  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; return t;
-}
+// 竹の集成材テクスチャ（実写画像・トライプラナーUV）
+const bambooPhoto=new THREE.TextureLoader().load('textures/bamboo.jpg');
+bambooPhoto.wrapS=bambooPhoto.wrapT=THREE.RepeatWrapping;
+bambooPhoto.colorSpace=THREE.SRGBColorSpace;
+bambooPhoto.anisotropy=8;
 function triplanarUV(geo,scale){
   const pos=geo.attributes.position, n=pos.count, uv=new Float32Array(n*2);
   const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),ab=new THREE.Vector3(),ac=new THREE.Vector3(),nr=new THREE.Vector3();
@@ -297,7 +288,7 @@ function triplanarUV(geo,scale){
 function engTex(text,aspect,fill){
   const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
-  x.clearRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H); x.textAlign='center'; x.textBaseline='middle';   // 乗算合成の下地は白
   let fs=Math.round(H*(fill||0.36)); x.font=`700 ${fs}px "Shippori Mincho B1", serif`;
   while(x.measureText(text).width>W*0.94 && fs>12){ fs-=4; x.font=`700 ${fs}px "Shippori Mincho B1", serif`; }
   x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
@@ -308,8 +299,8 @@ const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');
 
 new GLTFLoader().load('models/saisen.glb', gltf=>{
   const root=gltf.scene;
-  const mat=new THREE.MeshStandardMaterial({map:bambooTex(0xd8b878),color:0xffffff,roughness:0.62,metalness:0.02});
-  const brownMat=new THREE.MeshStandardMaterial({map:bambooTex(0xad8a56),color:0xffffff,roughness:0.6,metalness:0.03});
+  const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:0xd8b878,roughness:0.62,metalness:0.02});
+  const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,color:0xad8a56,roughness:0.6,metalness:0.03});
   const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
   const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
   const engNodes=[];
@@ -335,7 +326,7 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
     rc.set(wp.clone().addScaledVector(n,0.35), n.clone().negate());
     const hit=rc.intersectObject(g,true)[0];
     const pos=(hit?hit.point.clone():wp.clone()).addScaledVector(n,0.003);
-    const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+    const pl=new THREE.Mesh(new THREE.PlaneGeometry(W,H), new THREE.MeshStandardMaterial({map:engTex(cfg.t,W/H,cfg.fill),transparent:true,blending:THREE.MultiplyBlending,roughness:0.55,metalness:0,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
     pl.quaternion.copy(q); pl.position.copy(pos); pl.renderOrder=3; holder.add(pl);
   });
   controls.target.set(0,size.y*sc*0.5,0);
