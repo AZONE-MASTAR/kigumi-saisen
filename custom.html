@@ -52,9 +52,10 @@
   .sw{display:flex;gap:8px;flex-wrap:wrap}
   .swx{width:30px;height:30px;border-radius:8px;cursor:pointer;border:2px solid transparent;outline:1px solid rgba(0,0,0,.12)}
   .swx.sel{border-color:var(--ink)}
-  #engFields input{width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:15px;font-family:var(--mincho);color:var(--ink);outline:none}
-  #engFields input:focus{border-color:var(--accent)}
-  #engFields input::placeholder{color:#c3bba9;font-family:var(--sans)}
+  #engFields input,#engFields textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-size:15px;font-family:var(--mincho);color:var(--ink);outline:none}
+  #engFields textarea{resize:none;line-height:1.4}
+  #engFields input:focus,#engFields textarea:focus{border-color:var(--accent)}
+  #engFields input::placeholder,#engFields textarea::placeholder{color:#c3bba9;font-family:var(--sans)}
   .hintx{font-size:10.5px;color:var(--muted);margin-top:6px}
   .saveRow{display:flex;gap:8px;margin-bottom:8px}
   .sbtn{flex:1;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--sans)}
@@ -214,7 +215,7 @@ const FINISHES=[
 ];
 // 刻印スロット（GLBのノード名で対応付け）：前面の大きな板＋鳥居の額束に2つの一文字
 const ENGRAVINGS=[
-  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字）', ph:'例：〇〇神社／山田家', max:12, def:'賽銭箱', fill:0.36, weight:700, pscale:1.0},
+  {id:'main',  match:'大きな', label:'名入れ（前面・大きな文字・2行まで）', ph:'例：〇〇神社\n御一同', max:26, multiline:true, def:'賽銭箱', fill:0.36, weight:700, pscale:1.0},
   {id:'seal1', match:'刻印1',  label:'刻印①（額束・上／1文字）',   ph:'例：開',              max:1,  def:'開',   fill:0.90, weight:700, pscale:1.18},
   {id:'seal2', match:'刻印2',  label:'刻印②（額束・下／1文字）',   ph:'例：運',              max:1,  def:'運',   fill:0.90, weight:700, pscale:1.18}
 ];
@@ -303,13 +304,18 @@ function makeEngTex(text, aspect, fill, weight){
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
   x.clearRect(0,0,W,H);
   if(text){ x.textAlign='center'; x.textBaseline='middle';
-    let fs=Math.round(H*fill); x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
-    const maxW=W*0.94;
-    while(x.measureText(text).width>maxW && fs>18){ fs-=4; x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
-    const cx=W/2, cy=H*0.54;
+    const lines=text.split('\n').slice(0,2);                      // 前面は最大2行まで
+    const lh=1.22;                                                  // 行間
+    let fs=Math.round(H*fill*(lines.length>1?0.72:1));
+    x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
+    const maxW=W*0.94, maxBlockH=H*0.92;
+    const fits=()=>lines.every(l=>x.measureText(l).width<=maxW) && fs*lh*lines.length<=maxBlockH;
+    while(!fits() && fs>16){ fs-=4; x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
+    const cx=W/2, cy0=H*0.54-(lines.length-1)*fs*lh/2;
     // 薄い焼き色でやわらかく（重い黒縁は無し）
     x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
-    x.fillStyle=ENG_COLOR; x.fillText(text,cx,cy);
+    x.fillStyle=ENG_COLOR;
+    lines.forEach((l,i)=>x.fillText(l,cx,cy0+i*fs*lh));
   }
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
@@ -403,9 +409,13 @@ function buildEngFields(){
   ENGRAVINGS.forEach(e=>{
     const w=document.createElement('div'); w.style.marginBottom='9px';
     w.innerHTML=`<label style="display:block;font-size:11px;color:var(--muted);margin:0 0 3px">${e.label}</label>`
-      +`<input id="in_${e.id}" maxlength="${e.max}" placeholder="${e.ph}" value="${engVal[e.id]}" style="width:100%">`;
+      +(e.multiline
+        ? `<textarea id="in_${e.id}" maxlength="${e.max}" rows="2" style="width:100%"></textarea>`
+        : `<input id="in_${e.id}" maxlength="${e.max}" placeholder="${e.ph}" value="${engVal[e.id]}" style="width:100%">`);
     box.appendChild(w);
-    w.querySelector('input').addEventListener('input',ev=>{ engVal[e.id]=ev.target.value.trim(); refreshEng(); refreshBar(); autosave(); });
+    const el=w.querySelector(e.multiline?'textarea':'input');
+    if(e.multiline){ el.placeholder=e.ph; el.value=engVal[e.id]; }              // 改行を含むplaceholderはプロパティで設定
+    el.addEventListener('input',ev=>{ engVal[e.id]=e.multiline?ev.target.value:ev.target.value.trim(); refreshEng(); refreshBar(); autosave(); });
   });
 }
 function refreshBar(){ document.getElementById('barSpec').textContent=specText(); document.getElementById('barPrice').innerHTML=yen(price())+' <small>〜</small>'; }
