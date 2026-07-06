@@ -38,8 +38,9 @@
 
   /* customize dock */
   #dock{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:22;width:300px;max-width:calc(100vw - 36px);max-height:84vh;overflow:auto;
-        background:rgba(255,253,248,.94);border:1px solid var(--line);border-radius:18px;padding:20px;backdrop-filter:blur(10px);box-shadow:0 20px 50px rgba(80,66,40,.14)}
+        background:rgba(255,253,248,.94);border:1px solid var(--line);border-radius:18px;padding:20px;backdrop-filter:blur(10px);box-shadow:0 20px 50px rgba(80,66,40,.14);transition:max-height .28s ease}
   #dock h3{font-family:var(--mincho);font-weight:700;font-size:16px;margin-bottom:3px}
+  #dockToggle{display:none}
   #dock .sub{font-size:11px;color:var(--muted);margin-bottom:16px}
   .grp{margin-bottom:16px}
   .grp .lab{font-family:var(--sans);font-weight:700;font-size:11px;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
@@ -109,7 +110,18 @@
   .done h3{font-family:var(--mincho);font-weight:700;font-size:22px;margin-bottom:8px}
   .done p{color:var(--muted);font-size:13.5px;line-height:1.8}
   .done .onum{font-family:var(--old);letter-spacing:.06em;margin-top:14px;background:var(--wash);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:14px}
-  @media(max-width:720px){ #dock{top:auto;bottom:86px;transform:none;right:12px;left:12px;width:auto;max-height:44vh} #bar{left:12px;right:12px} }
+  @media(max-width:720px){
+    #dock{top:auto;bottom:86px;transform:none;right:12px;left:12px;width:auto;max-height:44vh;padding-top:0}
+    #dock.collapsed{max-height:52px;overflow:hidden}
+    #bar{left:12px;right:12px}
+    #dockToggle{display:flex;position:sticky;top:0;left:0;align-items:center;justify-content:space-between;gap:10px;
+      width:calc(100% + 40px);margin:0 -20px 14px;padding:16px 20px;background:rgba(255,253,248,.98);
+      border:none;border-bottom:1px solid var(--line);border-radius:18px 18px 0 0;
+      font-family:var(--sans);font-weight:700;font-size:13.5px;color:var(--ink);cursor:pointer;z-index:2}
+    #dockToggle .arrow{color:var(--accent-d);font-size:12px;transition:transform .28s ease;flex:none}
+    #dock.collapsed #dockToggle .arrow{transform:rotate(-90deg)}
+    #dockToggle .peek{font-size:11px;color:var(--muted);font-weight:500}
+  }
   @media(max-width:700px){
     #brand{font-size:14.5px}
     #brand .en{font-size:9px;letter-spacing:.1em}
@@ -133,6 +145,9 @@
 
 <!-- customize dock -->
 <div id="dock" style="display:none">
+  <button id="dockToggle" type="button">
+    <span>名入れ・刻印を編集 <span class="peek">タップで開閉</span></span><span class="arrow">▾</span>
+  </button>
   <h3>あなただけの一台に</h3>
   <div class="sub">竹集成材／刻印・名入れ無料・受注生産（大分・自社工場）</div>
 
@@ -359,7 +374,10 @@ new GLTFLoader().load('models/saisen.glb', gltf=>{
   document.getElementById('loader').style.display='none';
   document.getElementById('status').style.display='block';
   document.getElementById('spin').style.display='block';
-  document.getElementById('dock').style.display='block';
+  const dockEl=document.getElementById('dock');
+  dockEl.style.display='block';
+  if(matchMedia('(max-width:720px)').matches) dockEl.classList.add('collapsed');   // スマホは初期状態で畳み、商品を隠さない
+  document.getElementById('dockToggle').addEventListener('click',()=>dockEl.classList.toggle('collapsed'));
   document.getElementById('bar').style.display='flex';
   document.getElementById('hint').style.display='block'; setTimeout(()=>document.getElementById('hint').style.display='none',4500);
   buildEngFields(); refreshEng();                              // 3スロットのUI生成＋標準刻印表示
