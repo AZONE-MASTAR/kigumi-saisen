@@ -298,20 +298,24 @@ function triplanarUV(geo, scale){
 }
 
 // ---------- engraving planes (3 slots) ----------
+// 文字レイアウト（行分割・フォントサイズ・中心位置）を色テクスチャと法線マップで共有し、ズレを防ぐ
+function engLayout(ctx, text, W, H, fill, weight){
+  const lines=text.split('\n').slice(0,2);                        // 前面は最大2行まで
+  const lh=1.22;                                                    // 行間
+  let fs=Math.round(H*fill*(lines.length>1?0.72:1));
+  ctx.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
+  const maxW=W*0.94, maxBlockH=H*0.92;
+  const fits=()=>lines.every(l=>ctx.measureText(l).width<=maxW) && fs*lh*lines.length<=maxBlockH;
+  while(!fits() && fs>16){ fs-=4; ctx.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
+  return {lines, fs, lh, cx:W/2, cy0:H*0.54-(lines.length-1)*fs*lh/2};
+}
 function makeEngTex(text, aspect, fill, weight){
   fill=fill||0.72; weight=weight||700;
   const W=1024, H=Math.max(64,Math.round(W/Math.max(aspect,0.2)));
   const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
   x.clearRect(0,0,W,H);
   if(text){ x.textAlign='center'; x.textBaseline='middle';
-    const lines=text.split('\n').slice(0,2);                      // 前面は最大2行まで
-    const lh=1.22;                                                  // 行間
-    let fs=Math.round(H*fill*(lines.length>1?0.72:1));
-    x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`;
-    const maxW=W*0.94, maxBlockH=H*0.92;
-    const fits=()=>lines.every(l=>x.measureText(l).width<=maxW) && fs*lh*lines.length<=maxBlockH;
-    while(!fits() && fs>16){ fs-=4; x.font=`${weight} ${fs}px ${FONTS[fontIdx].css}`; }
-    const cx=W/2, cy0=H*0.54-(lines.length-1)*fs*lh/2;
+    const {lines,fs,lh,cx,cy0}=engLayout(x,text,W,H,fill,weight);
     // 薄い焼き色でやわらかく（重い黒縁は無し）
     x.shadowColor='rgba(90,60,30,0.25)'; x.shadowBlur=3; x.shadowOffsetY=1;
     x.fillStyle=ENG_COLOR;
@@ -319,9 +323,43 @@ function makeEngTex(text, aspect, fill, weight){
   }
   const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
 }
+// レーザー刻印の「凹み」を法線マップで表現：文字形状をぼかしてハイトフィールド化→勾配から法線を算出（実ジオメトリは変形せず、陰影だけで凹み感を出す）
+function makeEngNormal(text, aspect, fill, weight){
+  if(!text) return null;
+  fill=fill||0.72; weight=weight||700;
+  const NW=512, NH=Math.max(32,Math.round(NW/Math.max(aspect,0.2)));
+  const cv=document.createElement('canvas'); cv.width=NW; cv.height=NH; const x=cv.getContext('2d');
+  x.fillStyle='#000'; x.fillRect(0,0,NW,NH);
+  x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#fff';
+  x.filter='blur(5px)';                                             // 溝の丸み（シャープな崖ではなく丸みのある凹み）
+  const {lines,fs,lh,cx,cy0}=engLayout(x,text,NW,NH,fill,weight);
+  lines.forEach((l,i)=>x.fillText(l,cx,cy0+i*fs*lh));
+  x.filter='none';
+  const src=x.getImageData(0,0,NW,NH);
+  const out=x.createImageData(NW,NH);
+  const strength=1.6;                                               // 凹みの強さ（浅め・控えめ）
+  for(let y=0;y<NH;y++){
+    for(let px=0;px<NW;px++){
+      const i=(y*NW+px)*4;
+      const hL=src.data[(y*NW+Math.max(px-1,0))*4];
+      const hR=src.data[(y*NW+Math.min(px+1,NW-1))*4];
+      const hU=src.data[(Math.max(y-1,0)*NW+px)*4];
+      const hD=src.data[(Math.min(y+1,NH-1)*NW+px)*4];
+      let nx=(hL-hR)/255*strength, ny=(hU-hD)/255*strength, nz=1;
+      const len=Math.sqrt(nx*nx+ny*ny+nz*nz); nx/=len; ny/=len; nz/=len;
+      out.data[i]=Math.round((nx*0.5+0.5)*255); out.data[i+1]=Math.round((ny*0.5+0.5)*255); out.data[i+2]=Math.round((nz*0.5+0.5)*255); out.data[i+3]=255;
+    }
+  }
+  x.putImageData(out,0,0);
+  return new THREE.CanvasTexture(cv);
+}
 function refreshEng(){
   ENGRAVINGS.forEach(e=>{ if(!e.plane) return;
-    e.plane.material.map=makeEngTex(engVal[e.id], e.aspect, e.fill, e.weight); e.plane.material.needsUpdate=true;
+    const m=e.plane.material;
+    m.map=makeEngTex(engVal[e.id], e.aspect, e.fill, e.weight);
+    m.normalMap=makeEngNormal(engVal[e.id], e.aspect, e.fill, e.weight);
+    m.normalScale.set(0.55,0.55);
+    m.needsUpdate=true;
     e.plane.visible=!!engVal[e.id];
   });
 }
