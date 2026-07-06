@@ -310,11 +310,11 @@ function engTex(text,aspect,fill){
 }
 const isEng=o=>o.name.includes('刻印')||o.name.includes('大きな');
 
-new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
+new GLTFLoader().load('models/saisenglb4.glb', gltf=>{
   const root=gltf.scene;
   const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xd8b878,roughness:0.62,metalness:0.02});
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03});
-  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
+  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name.includes('マテリアル'));
   const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
   const engNodes=[]; const bodyMeshes=[];
   root.traverse(o=>{ if(!o.isMesh) return;

@@ -95,7 +95,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 const yen=n=>'¥'+n.toLocaleString();
 // 商品定義（将来ここに追加すれば自動でギャラリーに並ぶ）
 const PRODUCTS=[
-  {id:'saisen', name:'ki-gu-mi 賽銭貯金箱', price:6800, file:'models/saisenglb3.glb', base:0xd8b878, url:'custom.html', pos:[-3.2,-6]}
+  {id:'saisen', name:'ki-gu-mi 賽銭貯金箱', price:6800, file:'models/saisenglb4.glb', base:0xd8b878, url:'custom.html', pos:[-3.2,-6]}
 ];
 const COMING=[[3.2,-9.5],[-3.2,-13],[3.2,-16.5]];   // 将来商品用の空き台
 
@@ -199,7 +199,7 @@ PRODUCTS.forEach(p=>{ pedestal(p.pos[0],p.pos[1]);
     const root=gltf.scene;
     const mat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:p.base,roughness:0.62,metalness:0.02,envMapIntensity:0.7});
     const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto,normalMap:bambooNormal,roughnessMap:bambooRough,bumpMap:bambooBump,bumpScale:0.6,color:0xad8a56,roughness:0.6,metalness:0.03,envMapIntensity:0.6});   // 「茶色」＝橙マテリアルの部位（薄め）
-    const isBrownM=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
+    const isBrownM=o=>o.name.includes('茶色')||(o.material&&o.material.name.includes('マテリアル'));
     const ENGMAP={'大きな':{t:'賽銭箱',fill:0.36,ps:1.0},'刻印1':{t:'開',fill:0.90,ps:1.18},'刻印2':{t:'運',fill:0.90,ps:1.18}};
     const engNodes=[]; const bodyMeshes=[];
     root.traverse(o=>{ if(!o.isMesh) return;

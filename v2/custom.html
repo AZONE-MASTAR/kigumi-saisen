@@ -366,12 +366,12 @@ function refreshEng(){
 // ---------- load model ----------
 let boxMat=null;
 const isEngNode=o=>ENGRAVINGS.some(e=>o.name.includes(e.match));
-new GLTFLoader().load('models/saisenglb3.glb', gltf=>{
+new GLTFLoader().load('models/saisenglb4.glb', gltf=>{
   const root=gltf.scene;
   boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:FINISHES[finIdx].base, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
   // 「茶色」＝橙マテリアルの部位は濃い茶に（竹の木目は維持）
   const brownMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xad8a56, roughness:0.6, metalness:0.03, envMapIntensity:0.6});
-  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name==='マテリアル');
+  const isBrown=o=>o.name.includes('茶色')||(o.material&&o.material.name.includes('マテリアル'));
   // 本体メッシュに竹マテリアル。刻印プレースホルダ(Cube)・旧ベイク済みテキスト(文字)は退避してノード名で対応付け
   const engNodes={}; const bodyMeshes=[];
   root.traverse(o=>{
