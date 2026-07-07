@@ -269,6 +269,8 @@ let engNodes={}; let engPlanesReady=false;
 const easeOutCubic=t=>1-Math.pow(1-t,3);
 const clamp01=t=>Math.max(0,Math.min(1,t));
 
+// Blenderで手調整した爆発位置(フレーム1)を先に読み込んでから、モデルをロードする
+fetch('models/explode_offsets.json').then(r=>r.ok?r.json():{}).catch(()=>({})).then(EXPLODE_OFFSETS=>{
 new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
   const root=gltf.scene;
   const boxMat=new THREE.MeshStandardMaterial({map:bambooPhoto, normalMap:bambooNormal, roughnessMap:bambooRough, bumpMap:bambooBump, bumpScale:0.6, color:0xd8b878, roughness:0.62, metalness:0.02, envMapIntensity:0.7});
@@ -333,89 +335,25 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
   });
   refreshEng(); engPlanesReady=true;
 
-  // ---------- パーツごとの爆発初期値・組み立て順を計算 ----------
-  // 注意：mesh.position はroot直下のローカル座標（rootはboxGroup内でsc倍される）。
-  // 爆発オフセットはワールド寸法(modelHeight基準)で決めるため、ローカルに足す際は 1/sc して
-  // 「ワールドで見て正しい距離」になるよう補正する（そのままだと二重にスケールされ、ほぼ動いて見えなくなる）。
-  //
-  // 基準点(ANCHOR_NAME=本体.040)は爆発時も一切動かさない完全固定アンカー。
-  // 他の全パーツは「アンカーのY位置からどれだけ上にあるか」に応じて上方向へオフセットする
-  // （アンカーより低いパーツがあっても下には落とさず、アンカーの最下点を新しい床としてクランプする）。
+  // ---------- パーツごとの爆発初期値・組み立て順 ----------
   const N=bodyMeshes.length;
-  // 前方(+Z・カメラ側)へ引き出して見せるパーツ（saisenglb6固有のノード名。GLTFは「.」を除去するので本体.004→本体004）
-  const FRONT_PARTS=['本体004','本体041'];   // 本体004＝額(名入れプレート)、本体041＝しめ縄
-  const GOLDEN_ANGLE=Math.PI*(3-Math.sqrt(5));   // 黄金角。フィボナッチ螺旋でパーツを均等に分散させる
   const tmpBB=new THREE.Box3();
-  if(!anchorMesh) console.warn('assembly: anchor mesh', ANCHOR_NAME, 'not found — falling back to no anchor bias');
-  let anchorCenterY=modelCenter.y, anchorBottomY=0;
-  if(anchorMesh){
-    if(!anchorMesh.geometry.boundingBox) anchorMesh.geometry.computeBoundingBox();
-    const aBB=new THREE.Box3().copy(anchorMesh.geometry.boundingBox).applyMatrix4(anchorMesh.matrixWorld);
-    const aCenter=new THREE.Vector3(); aBB.getCenter(aCenter);
-    anchorCenterY=aCenter.y; anchorBottomY=aBB.min.y;
-  }
-  let idx=0;
+  // 爆発オフセットは Blender で手調整した位置(フレーム1)を models/explode_offsets.json から読み、そのまま適用する。
+  // JS側での自動計算はしない（＝Blenderが正）。キーはThree.js準拠でノード名の「.」除去済み、
+  // 値は [x,y,z]（GLB＝生モデル単位）で「組み立て済み位置からの移動量」。アンカー(本体040)や刻印面は移動量0で固定。
+  // 位置を変えたいときは Blenderのフレーム1を動かして再書き出しするだけで、この画面にそのまま反映される。
   const rawParts=bodyMeshes.map((mesh)=>{
-    const isAnchor=(mesh===anchorMesh);
-    // mesh.geometry のみからbboxを取る（setFromObjectだと継ぎ目輪郭のLineSegments2子要素を
-    // 巻き込んで異常に大きい/おかしなbboxになることがあるため、ジオメトリ単体→matrixWorldで変換）
     if(!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
     tmpBB.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-    const partCenterWorld=new THREE.Vector3(); tmpBB.getCenter(partCenterWorld);
-
-    if(isAnchor){
-      // 基準点：爆発時も常に組み立て済みの位置のまま（オフセットなし）
-      return { mesh, homePos: mesh.position.clone(), startPos: mesh.position.clone(), centerY: partCenterWorld.y, az:0, isAnchor:true };
-    }
-
-    const partSize=new THREE.Vector3(); tmpBB.getSize(partSize);
-    const partBottomY=tmpBB.min.y;                       // 組み立て時のこのパーツの最下点（ワールドY）
-    const partRadius=partSize.length()*0.5;              // パーツ自身の概算半径（大きいパーツほど遠くへ）
-
-    const aboveAnchor=Math.max(0, partCenterWorld.y-anchorCenterY);   // アンカーより上にある高さ（下にあれば0扱い）
-    let dir, az, dist;
-    if(FRONT_PARTS.includes(mesh.name)){
-      // 前方分解パーツ（saisenglb6固有）：額＝名入れプレート(本体004)・しめ縄(本体041)。
-      // 鳥居は箱より奥(-Z)にあり放射方向だと後方へ飛んでカメラから隠れるため、
-      // これらの「見せたい前面パーツ」は前方(+Z・カメラ側)へ少し上向きに引き出す。中央にあるので左右対称は保たれる。
-      dir=new THREE.Vector3(0, 0.35, 1).normalize();
-      az=Math.PI/2;                                     // ソート用（前方向き）
-      dist=modelHeight*0.5 + partRadius*0.9;            // 手前にはっきり引き出す（高さ差は使わず控えめに）
-    }else{
-      // ---- 左右対称な爆発方向 ----
-      // 各パーツを「モデル中心の縦軸から自分の水平位置への方向」へ押し出す。
-      // 商品は左右対称なので、+X のパーツは右へ・その鏡像(-X)は左へと自然に対称に散る。
-      // 方向も距離も対称量（位置・高さ・大きさ）だけで決め、hash等の非対称な乱数は使わない。
-      const hx=partCenterWorld.x-modelCenter.x;
-      const hz=partCenterWorld.z-modelCenter.z;
-      const horiz=new THREE.Vector3(hx,0,hz);
-      const hlen=horiz.length();
-      if(hlen>1e-3) horiz.multiplyScalar(1/hlen); else horiz.set(0,0,1);   // 中心軸上のパーツは前方(+Z)へ（対称を崩さない）
-      // 高いパーツほど上向き成分を強める（Y依存＝左右対称）
-      const heightT=clamp01((partCenterWorld.y-anchorBottomY)/Math.max(1e-3,modelHeight));   // 0(下)〜1(上)
-      const yBias=0.42+heightT*0.48;                       // Y成分の比率(0.42〜0.90・常に正＝上向き優先)
-      const horizW=Math.sqrt(Math.max(0,1-yBias*yBias));    // 単位ベクトルになるよう水平成分を正規化
-      dir=new THREE.Vector3(horiz.x*horizW, yBias, horiz.z*horizW).normalize();
-      az=Math.atan2(horiz.z,horiz.x);                       // 組み立て順の水平分散ソート用（方向から算出）
-      // ---- 爆発距離（対称量のみ・以前より寄せる）----
-      // アンカーからの高さ差＋パーツの大きさでスケール（大きい・高いパーツほど離して重なり低減）。
-      dist=modelHeight*0.26 + aboveAnchor*0.7 + partRadius*0.95;
-    }
-    const explodedOffsetWorld=dir.multiplyScalar(dist);
-
-    // アンカー最下点(=新しい床)より下に絶対に行かないようクランプ。
-    // 「このパーツの最下点+オフセットのY」がアンカー最下点を下回るなら、その分だけ持ち上げる
-    const explodedBottomY=partBottomY+explodedOffsetWorld.y;
-    if(explodedBottomY<anchorBottomY){ explodedOffsetWorld.y+=(anchorBottomY-explodedBottomY); }
-
-    const explodedOffsetLocal=explodedOffsetWorld.clone().divideScalar(sc);   // ローカル座標に変換（boxGroupのスケールを打ち消す）
-    // 回転は与えない：パーツは組み立て時と同じ向きのまま、位置だけ離す
+    const c=new THREE.Vector3(); tmpBB.getCenter(c);
+    const o=EXPLODE_OFFSETS[mesh.name];
+    const off=(o&&o.length===3)?new THREE.Vector3(o[0],o[1],o[2]):new THREE.Vector3();
     return {
       mesh,
-      homePos: mesh.position.clone(),          // 元の(=組み上がった)位置：ローカルではほぼ(0,0,0)
-      startPos: mesh.position.clone().add(explodedOffsetLocal),
-      centerY: partCenterWorld.y,
-      az                                        // 方位角（組み立て順の水平分散に利用）
+      homePos: mesh.position.clone(),
+      startPos: mesh.position.clone().add(off),   // 生モデル単位のオフセットを直接加算（boxGroupのsc倍は表示時に一緒に効く）
+      centerY: c.y,
+      az: Math.atan2(c.z-modelCenter.z, c.x-modelCenter.x)   // 組み立て順の水平分散ソート用
     };
   });
   // 組み立て順：重心Yの昇順（下の土台から上の鳥居・注連縄へ）を基本に、
@@ -457,6 +395,7 @@ new GLTFLoader().load('models/saisenglb6.glb', gltf=>{
   modelReady=true;
 }, ev=>{ if(ev.lengthComputable) document.getElementById('lt').textContent='竹を削り出しています… '+Math.round(ev.loaded/ev.total*100)+'%'; },
   err=>{ document.getElementById('lt').textContent='読み込みに失敗しました'; console.error(err); });
+});   // fetch(explode_offsets).then
 
 // ---------- progress -> pose ----------
 function applyProgress(p){
